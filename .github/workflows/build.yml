@@ -1,0 +1,113 @@
+name: cabe-go CI/CD
+
+on:
+  push:
+    branches: [master]
+  pull_request: {}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: make -j all
+
+      - name: Vet
+        run: make vet
+
+      - name: Test (Race and Coverage)
+        run: make test-cover
+
+      - name: Upload Coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.out
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Create report directory
+        run: mkdir -p build/lint-reports/golangci-lint
+
+      - uses: golangci/golangci-lint-action@v9
+        id: golangci-lint
+        continue-on-error: true
+        with:
+          version: latest
+          args: |
+            --config=.github/golangci.yml --output.text.path=stdout --output.json.path=${{ github.workspace }}/build/lint-reports/golangci-lint/cabe-go.json --output.sarif.path=${{ github.workspace }}/build/lint-reports/golangci-lint/cabe-go.sarif
+
+      - name: Upload linter reports as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-reports
+          path: build/lint-reports
+
+      - name: Ensure linters passed
+        run: |
+          if [[ "${{ steps.golangci-lint.outcome }}" != success ]]; then
+            echo >&2 "golangci-lint execution failed"
+            exit 1
+          fi
+
+  grype:
+    name: Grype
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run grype (source)
+        uses: anchore/scan-action@v7
+        id: scan-source
+        with:
+          path: .
+          config: .github/grype.yaml
+
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Syft
+        run: |
+          mkdir -p "$HOME/bin"
+          curl -sSfL "https://get.anchore.io/syft" | sh -s -- -b "$HOME/bin"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Generate SBOM (CycloneDX)
+        run: make sbom
+
+      - name: Upload SBOM as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: build/sbom/*.cdx.json
