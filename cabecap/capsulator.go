@@ -213,7 +213,7 @@ func (c *Capsulator) ensureARINToken(ctx context.Context) ([]byte, error) {
 	}
 	resp, err := c.client.GetARINToken(ctx, ckap.GetARINTokenRequest{})
 	if err != nil {
-		var srv *cabe.Error
+		var srv *ckap.Error
 		if errors.As(err, &srv) && srv.Code == cabe.CodeUnsupported {
 			c.markARINUnsupported()
 			return nil, nil

@@ -54,37 +54,3 @@ const (
 	// handling.
 	CodeInternal Code = 100
 )
-
-// Error represents a CKAP operation error, as indicated by a Key Server.
-type Error struct {
-	// Code is the CABE error code reported by the Key Server.
-	Code Code
-
-	// Summary is a brief, one-line, human-readable summary of the error.
-	Summary string
-
-	// Details is optional additional information a Key Server might
-	// choose to provide. The schema is implementation-specific.
-	Details map[string]any
-
-	// Op is the operation name that failed, e.g. "Prograde".
-	Op string
-
-	// Err is the underlying error, if any.
-	Err error
-}
-
-func (e *Error) Error() string {
-	if e == nil {
-		return "<nil>"
-	}
-	if e.Err != nil {
-		return e.Err.Error()
-	}
-	if e.Summary != "" {
-		return "cabe: " + e.Op + ": " + e.Summary
-	}
-	return "cabe: operation failed"
-}
-
-func (e *Error) Unwrap() error { return e.Err }

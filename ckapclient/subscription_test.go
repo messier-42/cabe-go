@@ -12,6 +12,7 @@ import (
 
 	"github.com/ldclabs/cose/key"
 	"github.com/messier-42/cabe-go/cabe"
+	"github.com/messier-42/cabe-go/ckap"
 	"github.com/messier-42/cabe-go/ckapclient"
 	"github.com/messier-42/cabe-go/ckapraw"
 	"github.com/tmaxmax/go-sse"
@@ -73,7 +74,7 @@ func TestSubscriptionStreamsEventsAndClosesOnCancel(t *testing.T) {
 // TestSubscriptionReturnsErrTokenRejected verifies that a non-2xx
 // response from the ARIN endpoint causes Run to return an error
 // satisfying errors.Is(err, ErrTokenRejected). The underlying
-// *cabe.Error survives via errors.As for structured inspection.
+// *ckap.Error survives via errors.As for structured inspection.
 func TestSubscriptionReturnsErrTokenRejected(t *testing.T) {
 	var arinCalls atomic.Int32
 	client, err := ckapclient.NewClient(ckapclient.Config{
@@ -114,15 +115,15 @@ func TestSubscriptionReturnsErrTokenRejected(t *testing.T) {
 	if !errors.Is(err, ckapclient.ErrTokenRejected) {
 		t.Fatalf("errors.Is(err, ErrTokenRejected) = false; err = %v", err)
 	}
-	var cabeErr *cabe.Error
-	if !errors.As(err, &cabeErr) {
-		t.Fatalf("errors.As(err, *cabe.Error) = false; err = %v (%T)", err, err)
+	var ckapErr *ckap.Error
+	if !errors.As(err, &ckapErr) {
+		t.Fatalf("errors.As(err, *ckap.Error) = false; err = %v (%T)", err, err)
 	}
-	if cabeErr.Code != cabe.CodePolicyDenied {
-		t.Fatalf("Code = %d, want CodePolicyDenied", cabeErr.Code)
+	if ckapErr.Code != cabe.CodePolicyDenied {
+		t.Fatalf("Code = %d, want CodePolicyDenied", ckapErr.Code)
 	}
-	if cabeErr.Summary != "token expired" {
-		t.Fatalf("Summary = %q", cabeErr.Summary)
+	if ckapErr.Summary != "token expired" {
+		t.Fatalf("Summary = %q", ckapErr.Summary)
 	}
 	if got := arinCalls.Load(); got != 1 {
 		t.Fatalf("arinCalls = %d, want 1 (no retry on ResponseValidator rejection)", got)

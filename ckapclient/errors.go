@@ -4,6 +4,7 @@ import (
 	"maps"
 
 	"github.com/messier-42/cabe-go/cabe"
+	"github.com/messier-42/cabe-go/ckap"
 	"github.com/messier-42/cabe-go/ckapraw"
 )
 
@@ -13,8 +14,8 @@ import (
 // local marshaling problem). The caller supplies the fields; any
 // server-provided Details must not be used here, since by definition
 // the server did not produce a parseable Error for this path.
-func newClientError(op string, code cabe.Code, statusCode int, summary string, underlying error) *cabe.Error {
-	return &cabe.Error{
+func newClientError(op string, code cabe.Code, statusCode int, summary string, underlying error) *ckap.Error {
+	return &ckap.Error{
 		Op:      op,
 		Code:    code,
 		Summary: summary,
@@ -23,14 +24,14 @@ func newClientError(op string, code cabe.Code, statusCode int, summary string, u
 	}
 }
 
-// newServerError builds a *cabe.Error from a parsed CKAP Error response.
+// newServerError builds a *ckap.Error from a parsed CKAP Error response.
 // The CKAP Error wire structure is defined by the spec and is the
 // authoritative source for Code, Summary, and Details; this function
 // passes those through as-is. The observed HTTP status is merged into
 // Details under the reserved "httpStatus" key for operator-level
 // diagnostic visibility, but only when the server did not already
 // populate that key itself (the server's own value always wins).
-func newServerError(op string, statusCode int, serverErr ckapraw.Error) *cabe.Error {
+func newServerError(op string, statusCode int, serverErr ckapraw.Error) *ckap.Error {
 	details := serverErr.Details
 	if statusCode != 0 {
 		if _, already := details["httpStatus"]; !already {
@@ -45,7 +46,7 @@ func newServerError(op string, statusCode int, serverErr ckapraw.Error) *cabe.Er
 			details["httpStatus"] = statusCode
 		}
 	}
-	return &cabe.Error{
+	return &ckap.Error{
 		Op:      op,
 		Code:    cabe.Code(serverErr.ErrorCode),
 		Summary: serverErr.Summary,

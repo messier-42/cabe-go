@@ -287,7 +287,7 @@ func TestClientServerErrorSurfacesAsCabeError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	var opErr *cabe.Error
+	var opErr *ckap.Error
 	if !errors.As(err, &opErr) {
 		t.Fatalf("error type = %T", err)
 	}
@@ -362,7 +362,7 @@ func TestClientRejectsWrongResponseKind(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error on wrong response kind")
 	}
-	var opErr *cabe.Error
+	var opErr *ckap.Error
 	if !errors.As(err, &opErr) {
 		t.Fatalf("error type = %T", err)
 	}

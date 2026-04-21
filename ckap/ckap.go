@@ -9,9 +9,14 @@
 package ckap
 
 import (
+	"fmt"
+
 	"github.com/messier-42/cabe-go/attrset"
 	"github.com/messier-42/cabe-go/cabe"
 )
+
+// MediaType is the MIME type for CKAP.
+const MediaType = "application/ckap+cbor"
 
 // GetSelfRequest is the request structure for the CKAP GetSelf
 // operation. It is currently empty.
@@ -114,3 +119,38 @@ type GetARINTokenResponse struct {
 	// The opaque ARIN Token newly issued by the Key Server.
 	Token []byte
 }
+
+// Error represents a CKAP error, as indicated by a Key Server.
+type Error struct {
+	// Code is the CABE error code reported by the Key Server.
+	Code cabe.Code
+
+	// Summary is a brief, one-line, human-readable summary of the error.
+	Summary string
+
+	// Details provides any additional information a Key Server might
+	// choose to provide. The schema is implementation-specific.
+	Details map[string]any
+
+	// Op is the name of the operation that failed, e.g. "Prograde".
+	Op string
+
+	// Err is the underlying error, if any.
+	Err error
+}
+
+func (e *Error) Error() string {
+	if e == nil {
+		return "<nil>"
+	}
+
+	summaryLine := fmt.Sprintf("CKAP error %v: operation %q: %q", e.Code, e.Op, e.Summary)
+
+	if e.Err != nil {
+		return fmt.Sprintf("%s: %s", summaryLine, e.Err.Error())
+	} else {
+		return summaryLine
+	}
+}
+
+func (e *Error) Unwrap() error { return e.Err }

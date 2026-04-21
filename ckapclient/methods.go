@@ -12,7 +12,7 @@ import (
 // checkKind validates the kind field on a CKAP response against the
 // value required by the spec. A mismatch indicates the peer violated
 // the Request/Response pairing: treat it as a client-side protocol
-// error so callers receive a structured *cabe.Error rather than a
+// error so callers receive a structured *ckap.Error rather than a
 // successful-looking zero-valued response.
 func checkKind(op, got, want string) error {
 	if got != want {

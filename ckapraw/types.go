@@ -25,6 +25,7 @@ type GetSelfResponse struct {
 }
 
 type Error struct {
+	Kind      string         `cbor:"kind"`
 	ErrorCode int            `cbor:"errorCode"`
 	Summary   string         `cbor:"summary"`
 	Details   map[string]any `cbor:"details,omitempty"`

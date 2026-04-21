@@ -9,11 +9,11 @@ import (
 
 	"github.com/ldclabs/cose/key"
 	"github.com/messier-42/cabe-go/cabe"
+	"github.com/messier-42/cabe-go/ckap"
 	"github.com/messier-42/cabe-go/ckapraw"
 )
 
 const (
-	contentTypeCKAPCBOR    = "application/ckap+cbor"
 	contentTypeEventStream = "text/event-stream"
 
 	// maxResponseSize bounds the number of bytes read from a CKAP
@@ -40,7 +40,7 @@ func readLimitedBody(body io.Reader) ([]byte, error) {
 // doCBOR performs a CKAP POST request. reqBody is the wire-format request
 // struct (e.g. ckapraw.ProgradeRequest); respBody is a pointer to the matching
 // wire-format response struct into which the successful response is
-// decoded. On non-2xx or decoding failure, doCBOR returns a *cabe.Error.
+// decoded. On non-2xx or decoding failure, doCBOR returns a *ckap.Error.
 func (c *Client) doCBOR(ctx context.Context, op string, reqBody any, respBody any) error {
 	body, err := key.MarshalCBOR(reqBody)
 	if err != nil {
@@ -51,8 +51,8 @@ func (c *Client) doCBOR(ctx context.Context, op string, reqBody any, respBody an
 	if err != nil {
 		return fmt.Errorf("build %s request: %w", op, err)
 	}
-	req.Header.Set("Accept", contentTypeCKAPCBOR)
-	req.Header.Set("Content-Type", contentTypeCKAPCBOR)
+	req.Header.Set("Accept", ckap.MediaType)
+	req.Header.Set("Content-Type", ckap.MediaType)
 	req.Header.Set("User-Agent", c.cfg.UserAgent)
 
 	httpResp, err := c.cfg.HTTPClient.Do(req)
@@ -85,7 +85,7 @@ func (c *Client) doGetARINToken(ctx context.Context) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("build %s request: %w", op, err)
 	}
-	req.Header.Set("Accept", contentTypeCKAPCBOR)
+	req.Header.Set("Accept", ckap.MediaType)
 	req.Header.Set("User-Agent", c.cfg.UserAgent)
 
 	httpResp, err := c.cfg.HTTPClient.Do(req)

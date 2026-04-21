@@ -9,6 +9,7 @@ import (
 	"net/url"
 
 	"github.com/messier-42/cabe-go/cabe"
+	"github.com/messier-42/cabe-go/ckap"
 	"github.com/tmaxmax/go-sse"
 )
 
@@ -19,7 +20,7 @@ import (
 // detect this condition and respond by obtaining a fresh token via
 // GetARINToken and starting a new Subscription.
 //
-// The underlying *cabe.Error carrying the server's Code, Summary, and
+// The underlying *ckap.Error carrying the server's Code, Summary, and
 // Details is preserved via errors.Unwrap; ErrTokenRejected merely
 // identifies the broad category.
 var ErrTokenRejected = errors.New("ckapclient: ARIN token rejected by key server")
@@ -77,7 +78,7 @@ func NewSubscription(client *Client, opts SubscriptionOptions) *Subscription {
 //   - ctx.Err() on cancellation or client close;
 //   - an error satisfying errors.Is(err, ErrTokenRejected) when the
 //     server returned a non-2xx response on the ARIN endpoint;
-//   - a *cabe.Error otherwise (transport failure, retry budget
+//   - a *ckap.Error otherwise (transport failure, retry budget
 //     exhausted, malformed response).
 func (s *Subscription) Run(ctx context.Context) error {
 	if len(s.opts.Token) == 0 {
@@ -113,7 +114,7 @@ func (s *Subscription) run(ctx context.Context) error {
 			body, _ := readLimitedBody(resp.Body)
 			// Wrap decodeServerError's result so the caller can
 			// distinguish token-rejection via errors.Is while still
-			// retrieving the structured *cabe.Error via errors.As.
+			// retrieving the structured *ckap.Error via errors.As.
 			return &tokenRejectionError{inner: decodeServerError(opARIN, resp.StatusCode, body)}
 		},
 	}
@@ -144,19 +145,19 @@ func (s *Subscription) run(ctx context.Context) error {
 	if errors.As(err, &rej) {
 		return rej
 	}
-	// Any remaining *cabe.Error flows through unchanged; anything
+	// Any remaining *ckap.Error flows through unchanged; anything
 	// else (ConnectionError with a non-cabe underlying cause, e.g.
 	// DNS failure after retry budget exhaustion) gets wrapped.
-	var cabeErr *cabe.Error
+	var cabeErr *ckap.Error
 	if errors.As(err, &cabeErr) {
 		return cabeErr
 	}
 	return newClientError(opARIN, cabe.CodeReserved, 0, "", err)
 }
 
-// tokenRejectionError wraps a server-side *cabe.Error produced by the ARIN
+// tokenRejectionError wraps a server-side *ckap.Error produced by the ARIN
 // ResponseValidator so that errors.Is matches ErrTokenRejected while
-// errors.As still retrieves the underlying *cabe.Error for structured
+// errors.As still retrieves the underlying *ckap.Error for structured
 // inspection.
 type tokenRejectionError struct {
 	inner error

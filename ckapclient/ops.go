@@ -2,7 +2,7 @@ package ckapclient
 
 // CKAP operation names. Each is used verbatim as:
 //
-//   - the Op field of *cabe.Error surfaced from the corresponding
+//   - the Op field of *ckap.Error surfaced from the corresponding
 //     client method;
 //   - the last URL path component of the POST endpoint for CBOR
 //     operations (e.g. BaseURL + opPrograde);
