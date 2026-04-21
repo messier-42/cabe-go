@@ -43,7 +43,7 @@ func TestClientGetSelf(t *testing.T) {
 					t.Fatalf("unexpected path %s", r.URL.Path)
 				}
 				data, err := key.MarshalCBOR(ckapraw.GetSelfResponse{
-					Kind: "GetSelfResponse",
+					Kind: ckapraw.KindGetSelfResponse,
 					Principal: ckapraw.Principal{
 						URI:    "principal:test",
 						Claims: map[string]any{"role": "operator"},
@@ -91,7 +91,7 @@ func TestClientProgradeReturnsLease(t *testing.T) {
 					t.Fatalf("unexpected ARIN token on Prograde: %x", req.ARINToken)
 				}
 				data, err := key.MarshalCBOR(ckapraw.ProgradeResponse{
-					Kind: "ProgradeResponse",
+					Kind: ckapraw.KindProgradeResponse,
 					Lease: ckapraw.Lease{
 						LeaseID:  "l-1",
 						LeaseRef: []byte("lease-ref"),
@@ -152,7 +152,7 @@ func TestClientProgradeAttachesARINToken(t *testing.T) {
 				}
 				gotToken = append([]byte(nil), req.ARINToken...)
 				data, _ := key.MarshalCBOR(ckapraw.ProgradeResponse{
-					Kind: "ProgradeResponse",
+					Kind: ckapraw.KindProgradeResponse,
 					Lease: ckapraw.Lease{
 						LeaseRef: []byte("ref"),
 						LKAI:     ckapraw.LKAI{Captive: &ckapraw.LKAIActive{LeaseKeyAccessToken: []byte("lkat")}},
@@ -188,7 +188,7 @@ func TestClientRetrogradeReturnsLKAI(t *testing.T) {
 					t.Fatalf("unexpected path %s", r.URL.Path)
 				}
 				data, _ := key.MarshalCBOR(ckapraw.RetrogradeResponse{
-					Kind: "RetrogradeResponse",
+					Kind: ckapraw.KindRetrogradeResponse,
 					LKAI: ckapraw.LKAI{Captive: &ckapraw.LKAIActive{LeaseKeyAccessToken: []byte("lkat")}},
 				})
 				return cborResponse(http.StatusOK, data), nil
@@ -223,7 +223,7 @@ func TestClientAssistedEncapDecap(t *testing.T) {
 					var req ckapraw.AssistedEncapsulateRequest
 					_ = key.UnmarshalCBOR(body, &req)
 					data, _ := key.MarshalCBOR(ckapraw.AssistedEncapsulateResponse{
-						Kind:       "AssistedEncapsulateResponse",
+						Kind:       ckapraw.KindAssistedEncapsulateResponse,
 						WrappedCEK: append([]byte("wrapped:"), req.CEK...),
 					})
 					return cborResponse(http.StatusOK, data), nil
@@ -231,7 +231,7 @@ func TestClientAssistedEncapDecap(t *testing.T) {
 					var req ckapraw.AssistedDecapsulateRequest
 					_ = key.UnmarshalCBOR(body, &req)
 					data, _ := key.MarshalCBOR(ckapraw.AssistedDecapsulateResponse{
-						Kind: "AssistedDecapsulateResponse",
+						Kind: ckapraw.KindAssistedDecapsulateResponse,
 						CEK:  bytes.TrimPrefix(req.WrappedCEK, []byte("wrapped:")),
 					})
 					return cborResponse(http.StatusOK, data), nil
@@ -438,7 +438,7 @@ func TestClientDefaultUserAgent(t *testing.T) {
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				gotUA = r.Header.Get("User-Agent")
 				data, _ := key.MarshalCBOR(ckapraw.GetSelfResponse{
-					Kind:      "GetSelfResponse",
+					Kind:      ckapraw.KindGetSelfResponse,
 					Principal: ckapraw.Principal{URI: "p:x"},
 				})
 				return cborResponse(http.StatusOK, data), nil
@@ -472,7 +472,7 @@ func TestClientCustomUserAgent(t *testing.T) {
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				gotUA = r.Header.Get("User-Agent")
 				data, _ := key.MarshalCBOR(ckapraw.GetSelfResponse{
-					Kind:      "GetSelfResponse",
+					Kind:      ckapraw.KindGetSelfResponse,
 					Principal: ckapraw.Principal{URI: "p:x"},
 				})
 				return cborResponse(http.StatusOK, data), nil

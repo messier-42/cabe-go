@@ -28,10 +28,10 @@ func (c *Client) GetSelf(ctx context.Context, _ ckap.GetSelfRequest) (*ckap.GetS
 	var resp *ckap.GetSelfResponse
 	err := c.withCtx(ctx, func(ctx context.Context) error {
 		var wire ckapraw.GetSelfResponse
-		if err := c.doCBOR(ctx, opGetSelf, ckapraw.GetSelfRequest{Kind: opGetSelf + kindRequestSuffix}, &wire); err != nil {
+		if err := c.doCBOR(ctx, opGetSelf, ckapraw.GetSelfRequest{Kind: ckapraw.KindGetSelfRequest}, &wire); err != nil {
 			return err
 		}
-		if err := checkKind(opGetSelf, wire.Kind, opGetSelf+kindResponseSuffix); err != nil {
+		if err := checkKind(opGetSelf, wire.Kind, ckapraw.KindGetSelfResponse); err != nil {
 			return err
 		}
 		resp = &ckap.GetSelfResponse{
@@ -57,13 +57,13 @@ func (c *Client) Prograde(ctx context.Context, req ckap.ProgradeRequest) (*ckap.
 	err := c.withCtx(ctx, func(ctx context.Context) error {
 		var wire ckapraw.ProgradeResponse
 		if err := c.doCBOR(ctx, opPrograde, ckapraw.ProgradeRequest{
-			Kind:         opPrograde + kindRequestSuffix,
+			Kind:         ckapraw.KindProgradeRequest,
 			AttributeSet: ckapraw.AttributeSet(req.AttributeSet.Map()),
 			ARINToken:    req.ARINToken,
 		}, &wire); err != nil {
 			return err
 		}
-		if err := checkKind(opPrograde, wire.Kind, opPrograde+kindResponseSuffix); err != nil {
+		if err := checkKind(opPrograde, wire.Kind, ckapraw.KindProgradeResponse); err != nil {
 			return err
 		}
 		lease, err := wire.Lease.ToCABE()
@@ -85,13 +85,13 @@ func (c *Client) Retrograde(ctx context.Context, req ckap.RetrogradeRequest) (*c
 	err := c.withCtx(ctx, func(ctx context.Context) error {
 		var wire ckapraw.RetrogradeResponse
 		if err := c.doCBOR(ctx, opRetrograde, ckapraw.RetrogradeRequest{
-			Kind:         opRetrograde + kindRequestSuffix,
+			Kind:         ckapraw.KindRetrogradeRequest,
 			AttributeSet: ckapraw.AttributeSet(req.AttributeSet.Map()),
 			LeaseRef:     req.LeaseRef,
 		}, &wire); err != nil {
 			return err
 		}
-		if err := checkKind(opRetrograde, wire.Kind, opRetrograde+kindResponseSuffix); err != nil {
+		if err := checkKind(opRetrograde, wire.Kind, ckapraw.KindRetrogradeResponse); err != nil {
 			return err
 		}
 		lkai, err := wire.LKAI.ToCABE()
@@ -115,13 +115,13 @@ func (c *Client) AssistedEncapsulate(ctx context.Context, req ckap.AssistedEncap
 	err := c.withCtx(ctx, func(ctx context.Context) error {
 		var wire ckapraw.AssistedEncapsulateResponse
 		if err := c.doCBOR(ctx, opAssistedEncapsulate, ckapraw.AssistedEncapsulateRequest{
-			Kind:                opAssistedEncapsulate + kindRequestSuffix,
+			Kind:                ckapraw.KindAssistedEncapsulateRequest,
 			LeaseKeyAccessToken: req.LKAT,
 			CEK:                 req.CEK,
 		}, &wire); err != nil {
 			return err
 		}
-		if err := checkKind(opAssistedEncapsulate, wire.Kind, opAssistedEncapsulate+kindResponseSuffix); err != nil {
+		if err := checkKind(opAssistedEncapsulate, wire.Kind, ckapraw.KindAssistedEncapsulateResponse); err != nil {
 			return err
 		}
 		resp = &ckap.AssistedEncapsulateResponse{WrappedCEK: wire.WrappedCEK}
@@ -141,13 +141,13 @@ func (c *Client) AssistedDecapsulate(ctx context.Context, req ckap.AssistedDecap
 	err := c.withCtx(ctx, func(ctx context.Context) error {
 		var wire ckapraw.AssistedDecapsulateResponse
 		if err := c.doCBOR(ctx, opAssistedDecapsulate, ckapraw.AssistedDecapsulateRequest{
-			Kind:                opAssistedDecapsulate + kindRequestSuffix,
+			Kind:                ckapraw.KindAssistedDecapsulateRequest,
 			LeaseKeyAccessToken: req.LKAT,
 			WrappedCEK:          req.WrappedCEK,
 		}, &wire); err != nil {
 			return err
 		}
-		if err := checkKind(opAssistedDecapsulate, wire.Kind, opAssistedDecapsulate+kindResponseSuffix); err != nil {
+		if err := checkKind(opAssistedDecapsulate, wire.Kind, ckapraw.KindAssistedDecapsulateResponse); err != nil {
 			return err
 		}
 		resp = &ckap.AssistedDecapsulateResponse{CEK: wire.CEK}

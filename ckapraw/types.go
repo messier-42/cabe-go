@@ -7,6 +7,22 @@ package ckapraw
 
 import "github.com/ldclabs/cose/key"
 
+// Kind* specifies the known values of the "kind" field on each CKAP
+// Request/Response structure.
+const (
+	KindError                       = "Error"
+	KindGetSelfRequest              = "GetSelfRequest"
+	KindGetSelfResponse             = "GetSelfResponse"
+	KindProgradeRequest             = "ProgradeRequest"
+	KindProgradeResponse            = "ProgradeResponse"
+	KindRetrogradeRequest           = "RetrogradeRequest"
+	KindRetrogradeResponse          = "RetrogradeResponse"
+	KindAssistedEncapsulateRequest  = "AssistedEncapsulateRequest"
+	KindAssistedEncapsulateResponse = "AssistedEncapsulateResponse"
+	KindAssistedDecapsulateRequest  = "AssistedDecapsulateRequest"
+	KindAssistedDecapsulateResponse = "AssistedDecapsulateResponse"
+)
+
 type AttributeSet map[string]any
 
 type GetSelfRequest struct {

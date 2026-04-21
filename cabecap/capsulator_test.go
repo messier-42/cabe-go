@@ -47,7 +47,7 @@ func TestCapsulatorManagedNonCaptive(t *testing.T) {
 				t.Fatalf("UnmarshalCBOR() error = %v", err)
 			}
 			data, err := key.MarshalCBOR(ckapraw.ProgradeResponse{
-				Kind: "ProgradeResponse",
+				Kind: ckapraw.KindProgradeResponse,
 				Lease: ckapraw.Lease{
 					LeaseRef: []byte("lease-ref"),
 					LKAI: ckapraw.LKAI{
@@ -69,7 +69,7 @@ func TestCapsulatorManagedNonCaptive(t *testing.T) {
 		case "/ckap/Retrograde":
 			retrogradeCalls++
 			data, _ := key.MarshalCBOR(ckapraw.RetrogradeResponse{
-				Kind: "RetrogradeResponse",
+				Kind: ckapraw.KindRetrogradeResponse,
 				LKAI: ckapraw.LKAI{
 					NonCaptive: &ckapraw.LKAINonCaptive{
 						LeaseKey: ckapraw.COSEKey{
@@ -131,7 +131,7 @@ func TestCapsulatorManagedCaptive(t *testing.T) {
 		switch r.URL.Path {
 		case pathProgradePath:
 			data, _ := key.MarshalCBOR(ckapraw.ProgradeResponse{
-				Kind: "ProgradeResponse",
+				Kind: ckapraw.KindProgradeResponse,
 				Lease: ckapraw.Lease{
 					LeaseRef: []byte("lease-ref"),
 					LKAI:     ckapraw.LKAI{Captive: &ckapraw.LKAIActive{LeaseKeyAccessToken: []byte("lkat")}},
@@ -144,7 +144,7 @@ func TestCapsulatorManagedCaptive(t *testing.T) {
 			var req ckapraw.AssistedEncapsulateRequest
 			_ = key.UnmarshalCBOR(body, &req)
 			data, _ := key.MarshalCBOR(ckapraw.AssistedEncapsulateResponse{
-				Kind:       "AssistedEncapsulateResponse",
+				Kind:       ckapraw.KindAssistedEncapsulateResponse,
 				WrappedCEK: append([]byte("wrapped:"), req.CEK...),
 			})
 			return cborResponse(http.StatusOK, data), nil
@@ -153,7 +153,7 @@ func TestCapsulatorManagedCaptive(t *testing.T) {
 			var req ckapraw.AssistedDecapsulateRequest
 			_ = key.UnmarshalCBOR(body, &req)
 			data, _ := key.MarshalCBOR(ckapraw.AssistedDecapsulateResponse{
-				Kind: "AssistedDecapsulateResponse",
+				Kind: ckapraw.KindAssistedDecapsulateResponse,
 				CEK:  bytes.TrimPrefix(req.WrappedCEK, []byte("wrapped:")),
 			})
 			return cborResponse(http.StatusOK, data), nil
@@ -236,7 +236,7 @@ func TestCapsulatorARINInvalidatesCache(t *testing.T) {
 		case r.Method == http.MethodPost && r.URL.Path == pathProgradePath:
 			progradeCalls.Add(1)
 			data, _ := key.MarshalCBOR(ckapraw.ProgradeResponse{
-				Kind: "ProgradeResponse",
+				Kind: ckapraw.KindProgradeResponse,
 				Lease: ckapraw.Lease{
 					LeaseID:  "lease-id-1",
 					LeaseRef: []byte("lease-ref"),
@@ -328,7 +328,7 @@ func TestCapsulatorARINRefreshesExpiredToken(t *testing.T) {
 		case r.Method == http.MethodPost && r.URL.Path == pathProgradePath:
 			progradeCalls.Add(1)
 			data, _ := key.MarshalCBOR(ckapraw.ProgradeResponse{
-				Kind: "ProgradeResponse",
+				Kind: ckapraw.KindProgradeResponse,
 				Lease: ckapraw.Lease{
 					LeaseID:  "lease-id-1",
 					LeaseRef: []byte("lease-ref"),
@@ -399,7 +399,7 @@ func TestCapsulatorARINUnsupportedServerIsBestEffort(t *testing.T) {
 		case r.Method == http.MethodPost && r.URL.Path == pathProgradePath:
 			progradeCalls.Add(1)
 			data, _ := key.MarshalCBOR(ckapraw.ProgradeResponse{
-				Kind: "ProgradeResponse",
+				Kind: ckapraw.KindProgradeResponse,
 				Lease: ckapraw.Lease{
 					LeaseRef: []byte("lease-ref"),
 					LKAI: ckapraw.LKAI{

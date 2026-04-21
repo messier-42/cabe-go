@@ -16,7 +16,7 @@ import (
 // with the given HTTP status.
 func WriteErrorHTTP(ctx context.Context, e ckap.Error, w http.ResponseWriter, httpStatus int) {
 	body, err := cbor.Marshal(ckapraw.Error{
-		Kind:      "Error",
+		Kind:      ckapraw.KindError,
 		ErrorCode: int(e.Code),
 		Summary:   e.Summary,
 		Details:   e.Details,
