@@ -40,6 +40,11 @@ const (
 	// not well-formed (e.g. invalid key grammar, value outside the CBOR
 	// Basic Data Model, duplicate keys).
 	CodeInvalidAttributeSet
+
+	// CodeRequestTooLarge indicates the request body exceeded the
+	// Key Server's configured size limit. It is reported with HTTP
+	// status 413 (Payload Too Large) over the HTTP transport.
+	CodeRequestTooLarge
 )
 
 const (
