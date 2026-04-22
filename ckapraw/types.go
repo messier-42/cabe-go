@@ -23,8 +23,6 @@ const (
 	KindAssistedDecapsulateResponse = "AssistedDecapsulateResponse"
 )
 
-type AttributeSet map[string]any
-
 type GetSelfRequest struct {
 	Kind string `cbor:"kind"`
 }
@@ -48,9 +46,9 @@ type Error struct {
 }
 
 type ProgradeRequest struct {
-	Kind         string       `cbor:"kind"`
-	AttributeSet AttributeSet `cbor:"attributeSet"`
-	ARINToken    []byte       `cbor:"arinToken,omitempty"`
+	Kind         string  `cbor:"kind"`
+	AttributeSet AttrSet `cbor:"attributeSet"`
+	ARINToken    []byte  `cbor:"arinToken,omitempty"`
 }
 
 type ProgradeResponse struct {
@@ -59,15 +57,15 @@ type ProgradeResponse struct {
 }
 
 type RetrogradeRequest struct {
-	Kind         string       `cbor:"kind"`
-	AttributeSet AttributeSet `cbor:"attributeSet"`
-	LeaseRef     []byte       `cbor:"leaseRef"`
+	Kind         string  `cbor:"kind"`
+	AttributeSet AttrSet `cbor:"attributeSet"`
+	LeaseRef     []byte  `cbor:"leaseRef"`
 }
 
 type RetrogradeResponse struct {
-	Kind         string       `cbor:"kind"`
-	AttributeSet AttributeSet `cbor:"attributeSet,omitempty"`
-	LKAI         LKAI         `cbor:"lkai"`
+	Kind         string  `cbor:"kind"`
+	AttributeSet AttrSet `cbor:"attributeSet,omitempty"`
+	LKAI         LKAI    `cbor:"lkai"`
 }
 
 type AssistedEncapsulateRequest struct {
@@ -93,11 +91,11 @@ type AssistedDecapsulateResponse struct {
 }
 
 type Lease struct {
-	LeaseID      string       `cbor:"leaseID,omitempty"`
-	LeaseRef     []byte       `cbor:"leaseRef"`
-	AttributeSet AttributeSet `cbor:"attributeSet,omitempty"`
-	LKAI         LKAI         `cbor:"lkai"`
-	Expiry       int64        `cbor:"expiry"`
+	LeaseID      string  `cbor:"leaseID,omitempty"`
+	LeaseRef     []byte  `cbor:"leaseRef"`
+	AttributeSet AttrSet `cbor:"attributeSet,omitempty"`
+	LKAI         LKAI    `cbor:"lkai"`
+	Expiry       int64   `cbor:"expiry"`
 }
 
 type LKAI struct {

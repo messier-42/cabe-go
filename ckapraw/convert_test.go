@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ldclabs/cose/key"
+	"github.com/messier-42/cabe-go/attrset"
 	"github.com/messier-42/cabe-go/ckapraw"
 )
 
@@ -17,17 +18,21 @@ func TestLeaseToCABENonCaptive(t *testing.T) {
 		-1: []byte("0123456789abcdef"),
 		5:  []byte("abcdefghijkl"),
 	}
+	inAttrs, err := attrset.New(map[string]any{
+		"project": "cabe",
+		"tier":    2,
+	})
+	if err != nil {
+		t.Fatalf("attrset.New: %v", err)
+	}
 	in := ckapraw.Lease{
 		LeaseID:  "l-42",
 		LeaseRef: []byte("lease-ref"),
 		LKAI: ckapraw.LKAI{
 			NonCaptive: &ckapraw.LKAINonCaptive{LeaseKey: rawKey},
 		},
-		Expiry: 4070908800,
-		AttributeSet: ckapraw.AttributeSet{
-			"project": "cabe",
-			"tier":    2,
-		},
+		Expiry:       4070908800,
+		AttributeSet: ckapraw.FromSet(inAttrs),
 	}
 
 	out, err := in.ToCABE()

@@ -58,7 +58,7 @@ func (c *Client) Prograde(ctx context.Context, req ckap.ProgradeRequest) (*ckap.
 		var wire ckapraw.ProgradeResponse
 		if err := c.doCBOR(ctx, opPrograde, ckapraw.ProgradeRequest{
 			Kind:         ckapraw.KindProgradeRequest,
-			AttributeSet: ckapraw.AttributeSet(req.AttributeSet.Map()),
+			AttributeSet: ckapraw.FromSet(req.AttributeSet),
 			ARINToken:    req.ARINToken,
 		}, &wire); err != nil {
 			return err
@@ -86,7 +86,7 @@ func (c *Client) Retrograde(ctx context.Context, req ckap.RetrogradeRequest) (*c
 		var wire ckapraw.RetrogradeResponse
 		if err := c.doCBOR(ctx, opRetrograde, ckapraw.RetrogradeRequest{
 			Kind:         ckapraw.KindRetrogradeRequest,
-			AttributeSet: ckapraw.AttributeSet(req.AttributeSet.Map()),
+			AttributeSet: ckapraw.FromSet(req.AttributeSet),
 			LeaseRef:     req.LeaseRef,
 		}, &wire); err != nil {
 			return err

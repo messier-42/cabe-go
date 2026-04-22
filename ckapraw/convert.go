@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/ldclabs/cose/key"
-	"github.com/messier-42/cabe-go/attrset"
 	"github.com/messier-42/cabe-go/cabe"
 )
 
@@ -19,20 +18,17 @@ func (in Lease) ToCABE() (*cabe.Lease, error) {
 	if err != nil {
 		return nil, err
 	}
-	out := &cabe.Lease{
-		LeaseID:  in.LeaseID,
-		LeaseRef: append([]byte(nil), in.LeaseRef...),
-		LKAI:     *lkai,
-		Expiry:   time.Unix(in.Expiry, 0).UTC(),
+	set, err := in.AttributeSet.Parse()
+	if err != nil {
+		return nil, fmt.Errorf("construct attribute set: %w", err)
 	}
-	if len(in.AttributeSet) > 0 {
-		set, err := attrset.New(map[string]any(in.AttributeSet))
-		if err != nil {
-			return nil, fmt.Errorf("construct attribute set: %w", err)
-		}
-		out.AttributeSet = set
-	}
-	return out, nil
+	return &cabe.Lease{
+		LeaseID:      in.LeaseID,
+		LeaseRef:     append([]byte(nil), in.LeaseRef...),
+		AttributeSet: set,
+		LKAI:         *lkai,
+		Expiry:       time.Unix(in.Expiry, 0).UTC(),
+	}, nil
 }
 
 // ToCABE converts a wire-format ckap.LKAI into the abstract cabe.LKAI.
