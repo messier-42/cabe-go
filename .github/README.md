@@ -988,4 +988,4 @@ The CABE specifications define the architecture, envelope format, and key access
 
 ## License
 
-This repository is licensed under the [Apache 2.0 license](doc/COPYING).
+This repository is licensed under the [Apache 2.0 license](../doc/COPYING).
