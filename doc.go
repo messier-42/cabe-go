@@ -9,7 +9,7 @@
 //
 //   - `ckapclient`, providing low level raw CKAP protocol operations.
 //
-//   - `capecap`, providing a managed CABE Encapsulator/Decapsulator.
+//   - `cabecap`, providing a managed CABE Encapsulator/Decapsulator.
 //
 //   - `cbes`, providing utilities for extracting information from CBES Envelope headers.
 //
