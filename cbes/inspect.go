@@ -1,6 +1,6 @@
 // Package cbes provides functionality for working with CBES envelopes.
 //
-// Currently, only envelope inspection is exposed here. For
+// Envelope inspection and inline FLP editing are exposed here. For
 // encapsulation/decapsulation, see the high-level cabecap package.
 package cbes
 
@@ -11,6 +11,7 @@ import (
 	"github.com/ldclabs/cose/cose"
 	"github.com/ldclabs/cose/iana"
 	"github.com/messier-42/cabe-go/attrset"
+	"github.com/messier-42/cabe-go/cabe"
 )
 
 // COSE header label strings used by CBES to carry CABE-specific fields
@@ -51,6 +52,11 @@ var allowedAlgorithms = map[int]struct{}{
 // is performed; every field reflects only what the protected or
 // unprotected headers declare.
 type InspectResult struct {
+	// OriginDomain is the declared CFAR Origin, or empty when absent.
+	OriginDomain string
+	// FLPs contains unverified inline packages, or nil when absent.
+	FLPs cabe.FLPSet
+
 	// AttributeSet is the decoded Attribute Set declared in the
 	// protected header. Inspect rejects envelopes whose Attribute Set
 	// encodings are not canonical.
@@ -113,6 +119,10 @@ func Inspect(data []byte) (InspectResult, error) {
 }
 
 func inspectEncrypt0(msg cose.Encrypt0Message[[]byte]) (InspectResult, error) {
+	origin, flps, err := inspectFederation(msg.Protected, msg.Unprotected)
+	if err != nil {
+		return InspectResult{}, err
+	}
 	attr, err := validatedAttributeSet(msg.Protected)
 	if err != nil {
 		return InspectResult{}, err
@@ -142,6 +152,8 @@ func inspectEncrypt0(msg cose.Encrypt0Message[[]byte]) (InspectResult, error) {
 	}
 
 	return InspectResult{
+		OriginDomain:        origin,
+		FLPs:                flps,
 		AttributeSet:        attr,
 		LeaseRef:            leaseRef,
 		ContentType:         contentType(msg.Protected),
@@ -154,6 +166,10 @@ func inspectEncrypt0(msg cose.Encrypt0Message[[]byte]) (InspectResult, error) {
 }
 
 func inspectEncrypt(msg cose.EncryptMessage[[]byte]) (InspectResult, error) {
+	origin, flps, err := inspectFederation(msg.Protected, msg.Unprotected)
+	if err != nil {
+		return InspectResult{}, err
+	}
 	attr, err := validatedAttributeSet(msg.Protected)
 	if err != nil {
 		return InspectResult{}, err
@@ -183,6 +199,8 @@ func inspectEncrypt(msg cose.EncryptMessage[[]byte]) (InspectResult, error) {
 	}
 
 	return InspectResult{
+		OriginDomain:        origin,
+		FLPs:                flps,
 		AttributeSet:        attr,
 		LeaseRef:            leaseRef,
 		ContentType:         contentType(msg.Protected),

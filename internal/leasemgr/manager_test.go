@@ -187,18 +187,18 @@ func TestManagerRetrogradeCacheLRUEvicts(t *testing.T) {
 	ctx := context.Background()
 	attrs, _ := attrset.New(map[string]any{"project": "cabe"})
 
-	if _, err := mgr.ResolveForDecapsulation(ctx, attrs, []byte("ref-a")); err != nil {
+	if _, err := mgr.ResolveForDecapsulation(ctx, attrs, []byte("ref-a"), nil); err != nil {
 		t.Fatalf("A: %v", err)
 	}
-	if _, err := mgr.ResolveForDecapsulation(ctx, attrs, []byte("ref-b")); err != nil {
+	if _, err := mgr.ResolveForDecapsulation(ctx, attrs, []byte("ref-b"), nil); err != nil {
 		t.Fatalf("B: %v", err)
 	}
 	// Third unique lookup evicts ref-a.
-	if _, err := mgr.ResolveForDecapsulation(ctx, attrs, []byte("ref-c")); err != nil {
+	if _, err := mgr.ResolveForDecapsulation(ctx, attrs, []byte("ref-c"), nil); err != nil {
 		t.Fatalf("C: %v", err)
 	}
 	before := tr.retrogradeCalls
-	if _, err := mgr.ResolveForDecapsulation(ctx, attrs, []byte("ref-a")); err != nil {
+	if _, err := mgr.ResolveForDecapsulation(ctx, attrs, []byte("ref-a"), nil); err != nil {
 		t.Fatalf("A re-resolve: %v", err)
 	}
 	if tr.retrogradeCalls != before+1 {
@@ -224,11 +224,11 @@ func TestManagerCachesRetrogradeByLeaseRef(t *testing.T) {
 	mgr := New(tr, &Config{Now: func() time.Time { return time.Unix(100, 0) }})
 	attrs, _ := attrset.New(map[string]any{"project": "cabe"})
 
-	first, err := mgr.ResolveForDecapsulation(context.Background(), attrs, []byte("lease-ref"))
+	first, err := mgr.ResolveForDecapsulation(context.Background(), attrs, []byte("lease-ref"), nil)
 	if err != nil {
 		t.Fatalf("ResolveForDecapsulation(first) error = %v", err)
 	}
-	second, err := mgr.ResolveForDecapsulation(context.Background(), attrs, []byte("lease-ref"))
+	second, err := mgr.ResolveForDecapsulation(context.Background(), attrs, []byte("lease-ref"), nil)
 	if err != nil {
 		t.Fatalf("ResolveForDecapsulation(second) error = %v", err)
 	}
@@ -262,13 +262,13 @@ func TestManagerInvalidationClearsRetrogradeCache(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveForEncapsulation() error = %v", err)
 	}
-	if _, err := mgr.ResolveForDecapsulation(context.Background(), attrs, active.LeaseRef); err != nil {
+	if _, err := mgr.ResolveForDecapsulation(context.Background(), attrs, active.LeaseRef, nil); err != nil {
 		t.Fatalf("ResolveForDecapsulation(first) error = %v", err)
 	}
 
 	mgr.InvalidateLeaseID("lease-id-1")
 
-	if _, err := mgr.ResolveForDecapsulation(context.Background(), attrs, active.LeaseRef); err != nil {
+	if _, err := mgr.ResolveForDecapsulation(context.Background(), attrs, active.LeaseRef, nil); err != nil {
 		t.Fatalf("ResolveForDecapsulation(second) error = %v", err)
 	}
 	if tr.retrogradeCalls != 1 {

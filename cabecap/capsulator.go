@@ -158,7 +158,11 @@ func (c *Capsulator) Decapsulate(ctx context.Context, envelopeBytes []byte) (cab
 
 	attrs := inspected.AttributeSet
 
-	lkai, err := c.leaseMgr.ResolveForDecapsulation(ctx, attrs, inspected.LeaseRef)
+	var federation *ckap.RetrogradeFederation
+	if inspected.OriginDomain != "" {
+		federation = &ckap.RetrogradeFederation{OriginDomain: inspected.OriginDomain, FLPs: inspected.FLPs}
+	}
+	lkai, err := c.leaseMgr.ResolveForDecapsulation(ctx, attrs, inspected.LeaseRef, federation)
 	if err != nil {
 		return cabe.Message{}, err
 	}

@@ -41,7 +41,7 @@ type Config struct {
 	ProgradeCacheSize int
 
 	// RetrogradeCacheSize bounds the number of cached LKAI entries
-	// keyed by (Attribute Set, Lease Reference). Specify 0 to use a reasonable
+	// keyed by (Origin, Attribute Set, Lease Reference). Specify 0 to use a reasonable
 	// default.
 	RetrogradeCacheSize int
 
@@ -66,13 +66,16 @@ type Manager struct {
 	// byID maps server-issued Lease IDs to Attribute Set Reprs, so ARIN
 	// invalidation events can evict the matching byAttrs entry.
 	byID map[string]attrset.Repr
-	// byRef maps (Attribute Set Repr, Lease Reference) to LKAIs. Bounded
+	// byRef maps (Origin, Attribute Set Repr, Lease Reference) to LKAIs. Bounded
 	// by Config.RetrogradeCacheSize.
-	byRef *lru.Cache[string, cabe.LKAI]
+	byRef *lru.Cache[resolutionKey, cabe.LKAI]
 }
 
 // Lease is the cache record for a currently-valid lease.
 type Lease struct {
+	// Federation preserves the issuing service's metadata for every Envelope.
+	Federation *cabe.LeaseFederation
+
 	// The lease ID for ARIN purposes, if any.
 	LeaseID string
 
@@ -122,7 +125,7 @@ func New(res Resolver, cfg *Config) *Manager {
 		// above, so this is programmer error.
 		panic(fmt.Sprintf("leasemgr: prograde cache size %d: %v", c.ProgradeCacheSize, err))
 	}
-	byRef, err := lru.New[string, cabe.LKAI](c.RetrogradeCacheSize)
+	byRef, err := lru.New[resolutionKey, cabe.LKAI](c.RetrogradeCacheSize)
 	if err != nil {
 		panic(fmt.Sprintf("leasemgr: retrograde cache size %d: %v", c.RetrogradeCacheSize, err))
 	}
@@ -147,7 +150,7 @@ func (m *Manager) onAttrsEvict(attrSetRepr attrset.Repr, lease *Lease) {
 			delete(m.byID, lease.LeaseID)
 		}
 	}
-	m.byRef.Remove(retrogradeKey(attrSetRepr, lease.LeaseRef))
+	m.byRef.Remove(retrogradeKey(attrSetRepr, lease.LeaseRef, leaseOrigin(lease)))
 }
 
 // ResolveForEncapsulation returns a cached or newly fetched active lease
@@ -174,10 +177,11 @@ func (m *Manager) ResolveForEncapsulation(ctx context.Context, attrs attrset.Set
 	lease := resp.Lease
 
 	active := &Lease{
-		LeaseID:  lease.LeaseID,
-		LeaseRef: append([]byte(nil), lease.LeaseRef...),
-		LKAI:     lease.LKAI,
-		Expiry:   lease.Expiry,
+		Federation: lease.Federation.Clone(),
+		LeaseID:    lease.LeaseID,
+		LeaseRef:   append([]byte(nil), lease.LeaseRef...),
+		LKAI:       lease.LKAI,
+		Expiry:     lease.Expiry,
 	}
 
 	m.mu.Lock()
@@ -185,16 +189,23 @@ func (m *Manager) ResolveForEncapsulation(ctx context.Context, attrs attrset.Set
 	if active.LeaseID != "" {
 		m.byID[active.LeaseID] = repr
 	}
-	m.byRef.Add(retrogradeKey(repr, active.LeaseRef), active.LKAI)
+	m.byRef.Add(retrogradeKey(repr, active.LeaseRef, leaseOrigin(active)), active.LKAI)
 	m.mu.Unlock()
 
 	return active, nil
 }
 
 // ResolveForDecapsulation returns the LKAI for the given attribute set
-// and lease reference, consulting the retrograde cache first.
-func (m *Manager) ResolveForDecapsulation(ctx context.Context, attrs attrset.Set, leaseRef []byte) (cabe.LKAI, error) {
-	cacheKey := retrogradeKey(attrs.Repr(), leaseRef)
+// and lease reference in the supplied federation context, consulting the cache first.
+func (m *Manager) ResolveForDecapsulation(ctx context.Context, attrs attrset.Set, leaseRef []byte, federation *ckap.RetrogradeFederation) (cabe.LKAI, error) {
+	origin := ""
+	if federation != nil {
+		if err := (cabe.LeaseFederation{OriginDomain: federation.OriginDomain, FLPs: federation.FLPs}).Validate(); err != nil {
+			return cabe.LKAI{}, err
+		}
+		origin = federation.OriginDomain
+	}
+	cacheKey := retrogradeKey(attrs.Repr(), leaseRef, origin)
 
 	m.mu.Lock()
 	if lkai, ok := m.byRef.Get(cacheKey); ok {
@@ -206,6 +217,7 @@ func (m *Manager) ResolveForDecapsulation(ctx context.Context, attrs attrset.Set
 	resp, err := m.resolver.Retrograde(ctx, ckap.RetrogradeRequest{
 		AttributeSet: attrs,
 		LeaseRef:     append([]byte(nil), leaseRef...),
+		Federation:   federation,
 	})
 	if err != nil {
 		return cabe.LKAI{}, fmt.Errorf("retrograde: %w", err)
@@ -247,14 +259,20 @@ func (a *Lease) NextPartialIV() []byte {
 	return buf[i:]
 }
 
-// retrogradeKey composes the (Attribute Set, Lease Reference) cache
-// key used by the retrograde cache.
-//
-// The concatenation of these values is unambiguous because
-// the first value is a CBOR encoded data item serialized using
-// the CBOR Core Deterministic Encoding Rules. This is assured because
-// we produce this representation using [attrset] without trusting
-// the input. As such, the attributeKey value is self-delimiting.
-func retrogradeKey(attrSetRepr attrset.Repr, leaseRef []byte) string {
-	return string(attrSetRepr) + string(leaseRef)
+// resolutionKey separates all context values, including an absent Origin.
+type resolutionKey struct {
+	attributes attrset.Repr
+	reference  string
+	origin     string
+}
+
+func retrogradeKey(attrs attrset.Repr, ref []byte, origin string) resolutionKey {
+	return resolutionKey{attributes: attrs, reference: string(ref), origin: origin}
+}
+
+func leaseOrigin(lease *Lease) string {
+	if lease.Federation == nil {
+		return ""
+	}
+	return lease.Federation.OriginDomain
 }

@@ -126,6 +126,11 @@ func (c *codec) Encapsulate(ctx context.Context, req EncapsulateArgs) (Encapsula
 	if req.Lease == nil {
 		return EncapsulateResult{}, errors.New("cabecap: active lease is required")
 	}
+	if req.Lease.Federation != nil {
+		if err := req.Lease.Federation.Validate(); err != nil {
+			return EncapsulateResult{}, err
+		}
+	}
 	if req.Lease.LKAI.NonCaptive != nil {
 		return c.encapsulateNonCaptive(req)
 	}
@@ -165,6 +170,7 @@ func (c *codec) encapsulateNonCaptive(req EncapsulateArgs) (EncapsulateResult, e
 		Payload: req.Payload,
 	}
 
+	addFederationHeaders(req.Lease.Federation, msg.Protected, &msg.Unprotected)
 	data, err := msg.EncryptAndEncode(encryptor, nil)
 	if err != nil {
 		return EncapsulateResult{}, fmt.Errorf("cabecap: encrypt envelope: %w", err)
@@ -218,6 +224,7 @@ func (c *codec) encapsulateCaptive(ctx context.Context, req EncapsulateArgs) (En
 		return EncapsulateResult{}, fmt.Errorf("add recipient: %w", err)
 	}
 
+	addFederationHeaders(req.Lease.Federation, msg.Protected, &msg.Unprotected)
 	data, err := msg.EncryptAndEncode(encryptor, nil)
 	if err != nil {
 		return EncapsulateResult{}, fmt.Errorf("encrypt captive envelope: %w", err)
@@ -229,6 +236,9 @@ func (c *codec) encapsulateCaptive(ctx context.Context, req EncapsulateArgs) (En
 }
 
 func (c *codec) Decapsulate(ctx context.Context, req DecapsulateArgs) (DecapsulateResult, error) {
+	if _, err := cbes.Inspect(req.Envelope); err != nil {
+		return DecapsulateResult{}, err
+	}
 	if req.LKAI.NonCaptive != nil {
 		return c.decapsulateNonCaptive(req.Envelope, req.LKAI.NonCaptive)
 	}
@@ -298,4 +308,17 @@ func (c *codec) decapsulateCaptive(ctx context.Context, data []byte, info *cabe.
 		Payload:     append([]byte(nil), msg.Payload...),
 		ContentType: contentType(msg.Protected),
 	}, nil
+}
+
+func addFederationHeaders(f *cabe.LeaseFederation, protected cose.Headers, unprotected *cose.Headers) {
+	if f == nil {
+		return
+	}
+	protected[cbes.HeaderOriginDomain] = f.OriginDomain
+	if len(f.FLPs) > 0 {
+		if *unprotected == nil {
+			*unprotected = cose.Headers{}
+		}
+		(*unprotected)[cbes.HeaderFLPs] = f.FLPs.Clone()
+	}
 }
