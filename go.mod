@@ -4,6 +4,7 @@ go 1.26.0
 
 require (
 	github.com/fxamacker/cbor/v2 v2.9.2
+	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/ldclabs/cose v1.4.0
 	github.com/spf13/cobra v1.10.2
@@ -14,7 +15,6 @@ require (
 
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
