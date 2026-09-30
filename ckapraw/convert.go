@@ -14,6 +14,13 @@ import (
 // re-serialised to CBOR so callers do not have to import the COSE
 // library.
 func (in Lease) ToCABE() (*cabe.Lease, error) {
+	var federation *cabe.LeaseFederation
+	if in.Federation != nil {
+		federation = &cabe.LeaseFederation{OriginDomain: in.Federation.OriginDomain, FLPs: in.Federation.FLPs.Clone()}
+		if err := federation.Validate(); err != nil {
+			return nil, err
+		}
+	}
 	lkai, err := in.LKAI.ToCABE()
 	if err != nil {
 		return nil, err
@@ -23,6 +30,7 @@ func (in Lease) ToCABE() (*cabe.Lease, error) {
 		return nil, fmt.Errorf("construct attribute set: %w", err)
 	}
 	return &cabe.Lease{
+		Federation:   federation,
 		LeaseID:      in.LeaseID,
 		LeaseRef:     append([]byte(nil), in.LeaseRef...),
 		AttributeSet: set,

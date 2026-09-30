@@ -58,6 +58,10 @@ type ProgradeResponse struct {
 // extracted from a previously received CBES Envelope, and ultimately
 // from a Lease previously created via a Prograde operation.
 type RetrogradeRequest struct {
+	// Federation quotes the Envelope Origin and any inline or sidecar FLPs.
+	// An empty FLP set is valid; the service may already know the capability.
+	Federation *RetrogradeFederation
+
 	// The Attribute Set from an Envelope.
 	AttributeSet attrset.Set
 
@@ -154,3 +158,20 @@ func (e *Error) Error() string {
 }
 
 func (e *Error) Unwrap() error { return e.Err }
+
+// RetrogradeFederation is the context for foreign key resolution.
+type RetrogradeFederation struct {
+	OriginDomain string
+	FLPs         cabe.FLPSet
+}
+
+// FederationIdentityRequest requests the public federation discovery resource.
+type FederationIdentityRequest struct{}
+
+// FederationIdentityResponse carries the advertised Domain identity and keys.
+type FederationIdentityResponse struct {
+	Identity cabe.FederationIdentity
+	// CacheControl and Expires preserve the resource's HTTP cache metadata.
+	CacheControl string
+	Expires      string
+}

@@ -9,6 +9,9 @@ import (
 
 // Lease represents a CABE Lease, as obtained via a Prograde operation.
 type Lease struct {
+	// Federation is nil when the issuing service does not report CFAR metadata.
+	Federation *LeaseFederation
+
 	// LeaseID is an optional server-issued identifier used for ARIN
 	// invalidation cross-referencing. Empty if a key server doesn't provide it.
 	LeaseID string

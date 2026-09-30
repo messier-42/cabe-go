@@ -10,6 +10,7 @@ import "github.com/ldclabs/cose/key"
 // Kind* specifies the known values of the "kind" field on each CKAP
 // Request/Response structure.
 const (
+	KindFederationIdentity          = "FederationIdentity"
 	KindError                       = "Error"
 	KindGetSelfRequest              = "GetSelfRequest"
 	KindGetSelfResponse             = "GetSelfResponse"
@@ -57,9 +58,10 @@ type ProgradeResponse struct {
 }
 
 type RetrogradeRequest struct {
-	Kind         string  `cbor:"kind"`
-	AttributeSet AttrSet `cbor:"attributeSet"`
-	LeaseRef     []byte  `cbor:"leaseRef"`
+	Federation   *RetrogradeFederation `cbor:"federation,omitempty"`
+	Kind         string                `cbor:"kind"`
+	AttributeSet AttrSet               `cbor:"attributeSet"`
+	LeaseRef     []byte                `cbor:"leaseRef"`
 }
 
 type RetrogradeResponse struct {
@@ -91,11 +93,12 @@ type AssistedDecapsulateResponse struct {
 }
 
 type Lease struct {
-	LeaseID      string  `cbor:"leaseID,omitempty"`
-	LeaseRef     []byte  `cbor:"leaseRef"`
-	AttributeSet AttrSet `cbor:"attributeSet,omitempty"`
-	LKAI         LKAI    `cbor:"lkai"`
-	Expiry       int64   `cbor:"expiry"`
+	Federation   *LeaseFederation `cbor:"federation,omitempty"`
+	LeaseID      string           `cbor:"leaseID,omitempty"`
+	LeaseRef     []byte           `cbor:"leaseRef"`
+	AttributeSet AttrSet          `cbor:"attributeSet,omitempty"`
+	LKAI         LKAI             `cbor:"lkai"`
+	Expiry       int64            `cbor:"expiry"`
 }
 
 type LKAI struct {

@@ -79,37 +79,39 @@ func (c *Client) doCBOR(ctx context.Context, op string, reqBody any, respBody an
 // doGetARINToken performs the GET /ARINToken request that initialises an
 // ARIN stream on the Key Server.
 func (c *Client) doGetARINToken(ctx context.Context) ([]byte, error) {
-	const op = opARINToken
+	var resp struct {
+		ARINToken []byte `cbor:"arinToken"`
+	}
+	if _, err := c.doGetCBOR(ctx, opARINToken, &resp); err != nil {
+		return nil, err
+	}
+	return resp.ARINToken, nil
+}
 
+// doGetCBOR retrieves a CKAP resource and returns its HTTP response headers.
+func (c *Client) doGetCBOR(ctx context.Context, op string, out any) (http.Header, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.cfg.BaseURL+op, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build %s request: %w", op, err)
 	}
 	req.Header.Set("Accept", ckap.MediaType)
 	req.Header.Set("User-Agent", c.cfg.UserAgent)
-
-	httpResp, err := c.cfg.HTTPClient.Do(req)
+	resp, err := c.cfg.HTTPClient.Do(req)
 	if err != nil {
 		return nil, newClientError(op, cabe.CodeReserved, 0, "", err)
 	}
-	defer httpResp.Body.Close() // best effort
-
-	data, err := readLimitedBody(httpResp.Body)
+	defer resp.Body.Close() // best effort
+	data, err := readLimitedBody(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("read %s response: %w", op, err)
 	}
-
-	if httpResp.StatusCode != http.StatusOK {
-		return nil, decodeServerError(op, httpResp.StatusCode, data)
+	if resp.StatusCode != http.StatusOK {
+		return nil, decodeServerError(op, resp.StatusCode, data)
 	}
-
-	var resp struct {
-		ARINToken []byte `cbor:"arinToken"`
-	}
-	if err := key.UnmarshalCBOR(data, &resp); err != nil {
+	if err := key.UnmarshalCBOR(data, out); err != nil {
 		return nil, fmt.Errorf("decode %s response: %w", op, err)
 	}
-	return resp.ARINToken, nil
+	return resp.Header.Clone(), nil
 }
 
 // decodeServerError attempts to parse a CKAP Error response body. If the

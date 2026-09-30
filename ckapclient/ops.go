@@ -7,6 +7,7 @@ package ckapclient
 //   - the last URL path component of the POST endpoint for CBOR
 //     operations (e.g. BaseURL + opPrograde).
 const (
+	opFederationIdentity  = "FederationIdentity"
 	opGetSelf             = "GetSelf"
 	opPrograde            = "Prograde"
 	opRetrograde          = "Retrograde"

@@ -84,8 +84,13 @@ func (c *Client) Retrograde(ctx context.Context, req ckap.RetrogradeRequest) (*c
 	var resp *ckap.RetrogradeResponse
 	err := c.withCtx(ctx, func(ctx context.Context) error {
 		var wire ckapraw.RetrogradeResponse
+		var federation *ckapraw.RetrogradeFederation
+		if req.Federation != nil {
+			federation = &ckapraw.RetrogradeFederation{OriginDomain: req.Federation.OriginDomain, FLPs: req.Federation.FLPs}
+		}
 		if err := c.doCBOR(ctx, opRetrograde, ckapraw.RetrogradeRequest{
 			Kind:         ckapraw.KindRetrogradeRequest,
+			Federation:   federation,
 			AttributeSet: ckapraw.FromSet(req.AttributeSet),
 			LeaseRef:     req.LeaseRef,
 		}, &wire); err != nil {
@@ -174,6 +179,32 @@ func (c *Client) GetARINToken(ctx context.Context, _ ckap.GetARINTokenRequest) (
 			return err
 		}
 		resp = &ckap.GetARINTokenResponse{Token: tok}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+// FederationIdentity retrieves the public federation discovery resource.
+// Cache headers are returned to the caller; the Client does not cache identities.
+func (c *Client) FederationIdentity(ctx context.Context, _ ckap.FederationIdentityRequest) (*ckap.FederationIdentityResponse, error) {
+	var resp *ckap.FederationIdentityResponse
+	err := c.withCtx(ctx, func(ctx context.Context) error {
+		var wire ckapraw.FederationIdentity
+		headers, err := c.doGetCBOR(ctx, opFederationIdentity, &wire)
+		if err != nil {
+			return err
+		}
+		if err := checkKind(opFederationIdentity, wire.Kind, ckapraw.KindFederationIdentity); err != nil {
+			return err
+		}
+		identity, err := wire.ToCABE()
+		if err != nil {
+			return err
+		}
+		resp = &ckap.FederationIdentityResponse{Identity: *identity, CacheControl: headers.Get("Cache-Control"), Expires: headers.Get("Expires")}
 		return nil
 	})
 	if err != nil {
