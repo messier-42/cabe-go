@@ -187,17 +187,17 @@ func TestAuthFlagValidation(t *testing.T) {
 	}{
 		{
 			name:   "cert without key",
-			args:   []string{"--client-cert", "/nowhere"},
+			args:   []string{testClientCertFlag, "/nowhere"},
 			errSub: "must be set together",
 		},
 		{
 			name:   "cert and spiffe",
-			args:   []string{"--client-cert", "/a", "--client-key", "/b", "--spiffe-socket", "/s", "--server-spiffe-id-regex", "^.*$"},
+			args:   []string{testClientCertFlag, "/a", "--client-key", "/b", testSPIFFESocketFlag, "/s", "--server-spiffe-id-regex", "^.*$"},
 			errSub: "mutually exclusive",
 		},
 		{
 			name:   "spiffe without regex",
-			args:   []string{"--spiffe-socket", "/s"},
+			args:   []string{testSPIFFESocketFlag, "/s"},
 			errSub: "--server-spiffe-id-regex is required",
 		},
 		{
