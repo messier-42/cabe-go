@@ -13,7 +13,7 @@ func checkCritical(h cose.Headers, understood func(any) bool) error {
 	if !h.Has(iana.HeaderParameterCrit) {
 		return nil
 	}
-	// Providers can construct typed Go arrays as well as decoded []any values.
+	// Callers can construct typed Go arrays as well as decoded []any values.
 	// Normalize through the COSE encoder before checking their structure.
 	raw, err := key.MarshalCBOR(h.Get(iana.HeaderParameterCrit))
 	if err != nil {
@@ -45,15 +45,13 @@ func checkCritical(h cose.Headers, understood func(any) bool) error {
 }
 
 func headerBytes(p, u cose.Headers, label any) ([]byte, error) {
-	v := u.Get(label)
 	if p.Has(label) {
-		v = p.Get(label)
+		return p.GetBytes(label)
 	}
-	b, ok := v.([]byte)
-	if !ok {
-		return nil, fmt.Errorf("coserecipient: header %v must be a byte string", label)
+	if u.Has(label) {
+		return u.GetBytes(label)
 	}
-	return b, nil
+	return nil, fmt.Errorf("coserecipient: missing byte-string header %v", label)
 }
 
 // integer checks the type before calling the dependency's reflection helper,

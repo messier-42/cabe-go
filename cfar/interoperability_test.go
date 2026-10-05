@@ -7,6 +7,7 @@ import (
 	"crypto/ecdh"
 	"crypto/hkdf"
 	"crypto/sha256"
+	"errors"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
@@ -79,7 +80,7 @@ func TestIndependentSFLPWithFullKDFContext(t *testing.T) {
 	encrypted := aead.Seal(nil, nonce, plaintext, key.MustMarshalCBOR([]any{encryptContext, protected, []byte{}}))
 	raw := key.MustMarshalCBOR([]any{protected, map[int]any{5: nonce}, encrypted, []any{recipient}})
 	secret := key.Key{1: 1, 2: []byte("fkid"), 3: -31, -1: 4, -4: receiver.Bytes()}
-	recovered, err := cfar.Recover(ctx, cabe.FLPSet{raw}, []key.Key{secret}, nil)
+	recovered, err := cfar.Recover(ctx, cabe.FLPSet{raw}, []key.Key{secret})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,39 +101,54 @@ func TestIndependentSFLPWithFullKDFContext(t *testing.T) {
 	}
 }
 
-type recordingAlgorithm struct{ ceks [][]byte }
-
-func recordingOptions(t *testing.T, recorder *recordingAlgorithm, keys ...key.Key) *cfar.Options {
+// Recover the package CEK from a wire recipient, retaining the exact
+// protected encoding for the KDF.
+func packageCEK(t *testing.T, raw []byte, secret key.Key) []byte {
 	t.Helper()
-	var registry coserecipient.Registry
-	for _, k := range keys {
-		if err := registry.Register(k.Get(iana.KeyParameterAlg), recorder); err != nil {
+	var parts []cbor.RawMessage
+	if err := key.UnmarshalCBOR(cose.RemoveCBORTag(raw), &parts); err != nil {
+		t.Fatal(err)
+	}
+	var recipients []cbor.RawMessage
+	if err := key.UnmarshalCBOR(parts[3], &recipients); err != nil {
+		t.Fatal(err)
+	}
+	for _, encoded := range recipients {
+		var r cose.Recipient
+		if err := r.UnmarshalCBOR(encoded); err != nil {
 			t.Fatal(err)
 		}
+		var fields []cbor.RawMessage
+		if err := key.UnmarshalCBOR(encoded, &fields); err != nil {
+			t.Fatal(err)
+		}
+		var protected []byte
+		if err := key.UnmarshalCBOR(fields[0], &protected); err != nil {
+			t.Fatal(err)
+		}
+		cek, err := coserecipient.UnwrapKey(secret, &r, coserecipient.Context{RecipientProtected: protected})
+		if err == nil {
+			return cek
+		}
 	}
-	return &cfar.Options{Recipients: &registry}
-}
-
-func (r *recordingAlgorithm) WrapKey(k key.Key, cek []byte, ctx coserecipient.Context) (*cose.Recipient, error) {
-	r.ceks = append(r.ceks, bytes.Clone(cek))
-	return coserecipient.Default.WrapKey(k, cek, ctx)
-}
-func (*recordingAlgorithm) UnwrapKey(k key.Key, r *cose.Recipient, ctx coserecipient.Context) ([]byte, error) {
-	return coserecipient.Default.UnwrapKey(k, r, ctx)
+	t.Fatal("no recipient yielded a content key")
+	return nil
 }
 
 func TestOneFreshCEKPerPackage(t *testing.T) {
-	a, _ := recipientForTest(t, iana.EllipticCurveP_256, iana.AlgorithmECDH_ES_A128KW)
-	b, _ := recipientForTest(t, iana.EllipticCurveX25519, iana.AlgorithmECDH_ES_A256KW)
-	recorder := &recordingAlgorithm{}
-	options := recordingOptions(t, recorder, a, b)
+	a, aSecret := recipientForTest(t, iana.EllipticCurveP_256, iana.AlgorithmECDH_ES_A128KW)
+	b, bSecret := recipientForTest(t, iana.EllipticCurveX25519, iana.AlgorithmECDH_ES_A256KW)
+	var previous []byte
 	for range 2 {
-		if _, err := cfar.Generate(contextForTest(t), leaseForTest(), []key.Key{a, b}, options); err != nil {
+		raw, err := cfar.Generate(contextForTest(t), leaseForTest(), []key.Key{a, b}, nil)
+		if err != nil {
 			t.Fatal(err)
 		}
-	}
-	if len(recorder.ceks) != 4 || !bytes.Equal(recorder.ceks[0], recorder.ceks[1]) || !bytes.Equal(recorder.ceks[2], recorder.ceks[3]) || bytes.Equal(recorder.ceks[0], recorder.ceks[2]) {
-		t.Fatal("CEK not fresh per package and shared among recipients")
+		first, second := packageCEK(t, raw, aSecret), packageCEK(t, raw, bSecret)
+		if !bytes.Equal(first, second) || bytes.Equal(first, previous) {
+			t.Fatal("CEK not fresh per package and shared among recipients")
+		}
+		previous = first
 	}
 }
 
@@ -151,7 +167,34 @@ func TestMalformedRecipientDoesNotBlockGoodRecipient(t *testing.T) {
 		malformed := key.MustMarshalCBOR([]any{[]byte{}, map[int]any{}, nil, []any{[]any{key.MustMarshalCBOR(map[int]any{2: []any{nil}}), map[int]any{}, nil}}})
 		parts[3] = key.MustMarshalCBOR(append([]cbor.RawMessage{malformed}, recipients...))
 	})
-	if _, err := cfar.Recover(ctx, cabe.FLPSet{raw}, []key.Key{s}, nil); err != nil {
+	if _, err := cfar.Recover(ctx, cabe.FLPSet{raw}, []key.Key{s}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestUnsupportedRecipientDoesNotBlockRecovery(t *testing.T) {
+	ctx := contextForTest(t)
+	public, secret := recipientForTest(t, iana.EllipticCurveX25519, iana.AlgorithmECDH_ES_A256KW)
+	raw, err := cfar.Generate(ctx, leaseForTest(), []key.Key{public}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Omit the key algorithm so the unsupported recipient's algorithm is tried.
+	delete(secret, iana.KeyParameterAlg)
+	raw = mutate(t, raw, func(parts []cbor.RawMessage) {
+		var recipients []cbor.RawMessage
+		if err := key.UnmarshalCBOR(parts[3], &recipients); err != nil {
+			t.Fatal(err)
+		}
+		unknown := key.MustMarshalCBOR([]any{[]byte{}, map[int]any{iana.HeaderParameterAlg: "unknown", iana.HeaderParameterKid: public.Kid()}, []byte{}})
+		parts[3] = key.MustMarshalCBOR(append([]cbor.RawMessage{unknown}, recipients...))
+	})
+	got, err := cfar.Recover(ctx, cabe.FLPSet{raw}, []key.Key{secret})
+	if err != nil || !bytes.Equal(got.RawCOSEKey, leaseForTest().RawCOSEKey) {
+		t.Fatalf("unsupported recipient prevented recovery: %v", err)
+	}
+	public[iana.KeyParameterAlg] = "unknown"
+	if _, err := cfar.Generate(ctx, leaseForTest(), []key.Key{public}, nil); !errors.Is(err, coserecipient.ErrUnsupportedAlgorithm) {
+		t.Fatalf("unsupported generation: %v", err)
 	}
 }

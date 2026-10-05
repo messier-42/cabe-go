@@ -79,7 +79,7 @@ func TestSFLPEndToEnd(t *testing.T) {
 					}
 					packages = cabe.FLPSet{packageBytes}
 				}
-				recovered, err := cfar.Recover(cfar.LeaseContext{OriginDomain: req.Federation.OriginDomain, AttributeSet: requestAttrs, LeaseRef: req.LeaseRef}, packages, []key.Key{priv}, nil)
+				recovered, err := cfar.Recover(cfar.LeaseContext{OriginDomain: req.Federation.OriginDomain, AttributeSet: requestAttrs, LeaseRef: req.LeaseRef}, packages, []key.Key{priv})
 				if err != nil {
 					t.Fatal(err)
 				}

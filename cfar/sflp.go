@@ -49,11 +49,12 @@ func (c LeaseContext) validate() error {
 	return nil
 }
 
-// Options selects SFLP content encryption and recipient providers.
-// Nil uses AES-256-GCM and coserecipient.Default.
+// Options selects SFLP content encryption and the optional sender key.
+// Nil uses AES-256-GCM.
 type Options struct {
-	// Recipients selects generic COSE recipient providers. Nil uses coserecipient.Default.
-	Recipients *coserecipient.Registry
+	// SenderKey is the sender's private COSE key for recipients that require
+	// static agreement. Other recipient constructions do not use it.
+	SenderKey key.Key
 	// ContentAlgorithm is a registered COSE AEAD algorithm, or zero for AES-256-GCM.
 	ContentAlgorithm int
 	// CEKSize is the key length in bytes. Zero selects the standard length for
@@ -67,8 +68,6 @@ type Options struct {
 // of the Lease Key algorithm, parameters and Base IV. No Origin signature or
 // authentication is added. Recipient keys must advertise alg and a nonempty kid
 // containing the FKID. Their types and remaining parameters are opaque to CFAR.
-// Configured providers must implement the asymmetric key distribution required
-// by SFLP; CFAR cannot infer that property from an opaque key type.
 // To omit the tag, use cose.RemoveCBORTag on the result.
 func Generate(ctx LeaseContext, lkai cabe.LKAINonCaptive, recipients []key.Key, options *Options) ([]byte, error) {
 	if err := ctx.validate(); err != nil {
@@ -119,25 +118,14 @@ func Generate(ctx LeaseContext, lkai cabe.LKAINonCaptive, recipients []key.Key, 
 		return nil, err
 	}
 	msg := cose.EncryptMessage[[]byte]{Protected: protected, Unprotected: unprotected, Payload: body}
-	protectedBytes, err := protected.Bytes()
-	if err != nil {
-		return nil, err
-	}
-	registry := opts.Recipients
-	if registry == nil {
-		registry = coserecipient.Default
-	}
 	for i, r := range recipients {
 		kid, err := r.GetBytes(iana.KeyParameterKid)
 		if err != nil || len(kid) == 0 {
 			return nil, fmt.Errorf("cfar: recipient %d missing FKID", i)
 		}
-		recipient, err := registry.WrapKey(r, cek, coserecipient.Context{BodyProtected: protectedBytes, BodyUnprotected: unprotected})
+		recipient, err := coserecipient.WrapKey(r, cek, coserecipient.Context{SenderKey: opts.SenderKey})
 		if err != nil {
 			return nil, fmt.Errorf("cfar: recipient %d: %w", i, err)
-		}
-		if recipient == nil {
-			return nil, errors.New("cfar: recipient implementation returned nil")
 		}
 		got, err := headerBytes(recipient.Protected, recipient.Unprotected, iana.HeaderParameterKid)
 		if err != nil || !bytes.Equal(got, kid) {
@@ -153,19 +141,15 @@ func Generate(ctx LeaseContext, lkai cabe.LKAINonCaptive, recipients []key.Key, 
 // Recover tries packages and matching recipient keys until one passes integrity,
 // content type, LKAI structure and exact Lease context checks. It accepts tagged
 // and untagged SFLPs and skips unusable or unrelated packages and recipients.
-// A nil registry uses coserecipient.Default. Recipient keys are opaque to CFAR;
-// their explicit algorithms select registered providers.
+// Recipient keys are opaque to CFAR; coserecipient handles key management.
 // The caller must authorize access separately. Recovery does not authenticate
 // the claimed Origin or establish trust in the returned key material.
-func Recover(ctx LeaseContext, packages cabe.FLPSet, keys []key.Key, registry *coserecipient.Registry) (*cabe.LKAINonCaptive, error) {
+func Recover(ctx LeaseContext, packages cabe.FLPSet, keys []key.Key) (*cabe.LKAINonCaptive, error) {
 	if err := ctx.validate(); err != nil {
 		return nil, err
 	}
-	if registry == nil {
-		registry = coserecipient.Default
-	}
 	for _, raw := range packages {
-		got, err := recoverPackage(ctx, raw, keys, registry)
+		got, err := recoverPackage(ctx, raw, keys)
 		if err == nil {
 			return got, nil
 		}
@@ -173,7 +157,7 @@ func Recover(ctx LeaseContext, packages cabe.FLPSet, keys []key.Key, registry *c
 	return nil, ErrNoUsablePackage
 }
 
-func recoverPackage(ctx LeaseContext, raw []byte, keys []key.Key, registry *coserecipient.Registry) (*cabe.LKAINonCaptive, error) {
+func recoverPackage(ctx LeaseContext, raw []byte, keys []key.Key) (*cabe.LKAINonCaptive, error) {
 	p, err := parsePackage(raw)
 	if err != nil {
 		return nil, err
@@ -225,7 +209,7 @@ func recoverPackage(ctx LeaseContext, raw []byte, keys []key.Key, registry *cose
 			if !bytes.Equal(kid, k.Kid()) {
 				continue
 			}
-			cek, err := registry.UnwrapKey(k, r, coserecipient.Context{BodyProtected: p.protectedBytes, BodyUnprotected: p.unprotected, RecipientProtected: protectedBytes, RecipientEncoded: rawRecipient})
+			cek, err := coserecipient.UnwrapKey(k, r, coserecipient.Context{RecipientProtected: protectedBytes, RequireWrappedKey: true})
 			if err != nil {
 				continue
 			}

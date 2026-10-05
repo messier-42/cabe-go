@@ -78,7 +78,7 @@ func TestSFLPMultipleRecipientsAndAlgorithms(t *testing.T) {
 				t.Fatal("FKID changed")
 			}
 			for _, form := range [][]byte{raw, cose.RemoveCBORTag(raw)} {
-				got, err := cfar.Recover(ctx, cabe.FLPSet{form}, []key.Key{s}, nil)
+				got, err := cfar.Recover(ctx, cabe.FLPSet{form}, []key.Key{s})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -132,7 +132,7 @@ func TestSFLPRejectsMismatchTamperingAndContinues(t *testing.T) {
 	bad = append(bad, mutate(t, good, func(fields []cbor.RawMessage) { fields[2] = []byte{0xf6} }))
 	bad = append(bad, mutate(t, good, func(fields []cbor.RawMessage) { fields[3] = key.MustMarshalCBOR([]any{}) }))
 	for _, p := range bad {
-		got, err := cfar.Recover(ctx, cabe.FLPSet{p}, []key.Key{sec}, nil)
+		got, err := cfar.Recover(ctx, cabe.FLPSet{p}, []key.Key{sec})
 		if !errors.Is(err, cfar.ErrNoUsablePackage) || got != nil {
 			t.Fatalf("bad package accepted: %v", err)
 		}
@@ -144,11 +144,11 @@ func TestSFLPRejectsMismatchTamperingAndContinues(t *testing.T) {
 	}
 	bad = append(bad, unrelated)
 	for _, flps := range []cabe.FLPSet{nil, {}, bad} {
-		if _, err := cfar.Recover(ctx, flps, []key.Key{sec}, nil); !errors.Is(err, cfar.ErrNoUsablePackage) {
+		if _, err := cfar.Recover(ctx, flps, []key.Key{sec}); !errors.Is(err, cfar.ErrNoUsablePackage) {
 			t.Fatalf("expected no usable package: %v", err)
 		}
 	}
-	got, err := cfar.Recover(ctx, append(bad, good), []key.Key{sec}, nil)
+	got, err := cfar.Recover(ctx, append(bad, good), []key.Key{sec})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -20,12 +20,11 @@ import (
 func TestSFLPProtectedMetadataAndBodyValidation(t *testing.T) {
 	ctx := contextForTest(t)
 	pub, sec := recipientForTest(t, iana.EllipticCurveX25519, iana.AlgorithmECDH_ES_A256KW)
-	recorder := &recordingAlgorithm{}
-	options := recordingOptions(t, recorder, pub)
-	good, err := cfar.Generate(ctx, leaseForTest(), []key.Key{pub}, options)
+	good, err := cfar.Generate(ctx, leaseForTest(), []key.Key{pub}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	cek := packageCEK(t, good, sec)
 	for _, label := range []any{cbes.HeaderOriginDomain, cbes.HeaderAttributeSet, cbes.HeaderLeaseRef, iana.HeaderParameterContentType} {
 		moved := mutate(t, good, func(parts []cbor.RawMessage) {
 			var raw []byte
@@ -44,7 +43,7 @@ func TestSFLPProtectedMetadataAndBodyValidation(t *testing.T) {
 			parts[0] = key.MustMarshalCBOR(key.MustMarshalCBOR(p))
 			parts[1] = key.MustMarshalCBOR(u)
 		})
-		if _, err := cfar.Recover(ctx, cabe.FLPSet{moved}, []key.Key{sec}, nil); err == nil {
+		if _, err := cfar.Recover(ctx, cabe.FLPSet{moved}, []key.Key{sec}); err == nil {
 			t.Fatalf("accepted unprotected %v", label)
 		}
 	}
@@ -64,7 +63,7 @@ func TestSFLPProtectedMetadataAndBodyValidation(t *testing.T) {
 	})
 	other := ctx
 	other.OriginDomain = "changed"
-	if _, err := cfar.Recover(other, cabe.FLPSet{changed}, []key.Key{sec}, nil); err == nil {
+	if _, err := cfar.Recover(other, cabe.FLPSet{changed}, []key.Key{sec}); err == nil {
 		t.Fatal("accepted tampered metadata with matching request")
 	}
 	// Use the real package CEK to create integrity-valid but structurally invalid
@@ -79,7 +78,7 @@ func TestSFLPProtectedMetadataAndBodyValidation(t *testing.T) {
 			if err := key.UnmarshalCBOR(parts[1], &u); err != nil {
 				t.Fatal(err)
 			}
-			block, err := aes.NewCipher(recorder.ceks[0])
+			block, err := aes.NewCipher(cek)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -93,12 +92,12 @@ func TestSFLPProtectedMetadataAndBodyValidation(t *testing.T) {
 			}
 			parts[2] = key.MustMarshalCBOR(aead.Seal(nil, nonce, key.MustMarshalCBOR(body), key.MustMarshalCBOR([]any{encryptContext, protected, []byte{}})))
 		})
-		if _, err := cfar.Recover(ctx, cabe.FLPSet{raw}, []key.Key{sec}, nil); err == nil {
+		if _, err := cfar.Recover(ctx, cabe.FLPSet{raw}, []key.Key{sec}); err == nil {
 			t.Fatalf("accepted invalid body %#v", body)
 		}
 	}
 	wrongTag := append([]byte{0xd8, 0x62}, cose.RemoveCBORTag(good)...)
-	if _, err := cfar.Recover(ctx, cabe.FLPSet{wrongTag}, []key.Key{sec}, nil); err == nil {
+	if _, err := cfar.Recover(ctx, cabe.FLPSet{wrongTag}, []key.Key{sec}); err == nil {
 		t.Fatal("accepted wrong COSE tag")
 	}
 }
@@ -127,10 +126,10 @@ func TestRecipientKeysAndFallback(t *testing.T) {
 		}
 		change(k)
 		bad := k
-		if _, err := cfar.Recover(ctx, cabe.FLPSet{good}, []key.Key{bad}, nil); err == nil {
+		if _, err := cfar.Recover(ctx, cabe.FLPSet{good}, []key.Key{bad}); err == nil {
 			t.Fatal("accepted invalid key")
 		}
-		if _, err := cfar.Recover(ctx, cabe.FLPSet{good}, []key.Key{bad, sec}, nil); err != nil {
+		if _, err := cfar.Recover(ctx, cabe.FLPSet{good}, []key.Key{bad, sec}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -177,7 +176,7 @@ func FuzzRecover(f *testing.F) {
 	f.Add([]byte{0x84, 0x40, 0xa0, 0x40, 0x80})
 	f.Add([]byte{0xf6})
 	f.Fuzz(func(t *testing.T, raw []byte) {
-		got, err := cfar.Recover(ctx, cabe.FLPSet{raw, good}, []key.Key{priv}, nil)
+		got, err := cfar.Recover(ctx, cabe.FLPSet{raw, good}, []key.Key{priv})
 		if err != nil || got == nil {
 			t.Fatalf("unusable package prevented fallback: %v", err)
 		}
@@ -187,12 +186,11 @@ func FuzzRecover(f *testing.F) {
 func TestUnprotectedContentAlgorithm(t *testing.T) {
 	ctx := contextForTest(t)
 	pub, sec := recipientForTest(t, iana.EllipticCurveX25519, iana.AlgorithmECDH_ES_A128KW)
-	recorder := &recordingAlgorithm{}
-	options := recordingOptions(t, recorder, pub)
-	raw, err := cfar.Generate(ctx, leaseForTest(), []key.Key{pub}, options)
+	raw, err := cfar.Generate(ctx, leaseForTest(), []key.Key{pub}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	cek := packageCEK(t, raw, sec)
 	raw = mutate(t, raw, func(parts []cbor.RawMessage) {
 		var protected, encrypted []byte
 		var p, u cose.Headers
@@ -208,7 +206,7 @@ func TestUnprotectedContentAlgorithm(t *testing.T) {
 		if err := key.UnmarshalCBOR(parts[2], &encrypted); err != nil {
 			t.Fatal(err)
 		}
-		block, err := aes.NewCipher(recorder.ceks[0])
+		block, err := aes.NewCipher(cek)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -231,7 +229,7 @@ func TestUnprotectedContentAlgorithm(t *testing.T) {
 		parts[1] = key.MustMarshalCBOR(u)
 		parts[2] = key.MustMarshalCBOR(aead.Seal(nil, nonce, plaintext, key.MustMarshalCBOR([]any{encryptContext, protected, []byte{}})))
 	})
-	if _, err := cfar.Recover(ctx, cabe.FLPSet{raw}, []key.Key{sec}, nil); err != nil {
+	if _, err := cfar.Recover(ctx, cabe.FLPSet{raw}, []key.Key{sec}); err != nil {
 		t.Fatal(err)
 	}
 }
