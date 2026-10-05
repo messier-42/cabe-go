@@ -11,6 +11,11 @@ import (
 	"github.com/messier-42/cabe-go/ckap"
 )
 
+const (
+	testProjectAttribute = "project"
+	testProject          = "cabe"
+)
+
 func nonCaptiveLease(ref []byte, key []byte, expiry time.Time) *cabe.Lease {
 	return &cabe.Lease{
 		LeaseRef: ref,
@@ -26,7 +31,7 @@ func TestManagerCachesUntilExpiry(t *testing.T) {
 	}
 	mgr := New(tr, &Config{Now: func() time.Time { return now }})
 
-	attrs, _ := attrset.New(map[string]any{"project": "cabe"})
+	attrs, _ := attrset.New(map[string]any{testProjectAttribute: testProject})
 	first, err := mgr.ResolveForEncapsulation(context.Background(), attrs, nil)
 	if err != nil {
 		t.Fatalf("ResolveForEncapsulation(first) error = %v", err)
@@ -56,7 +61,7 @@ func TestManagerRefreshesAfterExpiry(t *testing.T) {
 	current := now
 	mgr := New(tr, &Config{Now: func() time.Time { return current }})
 
-	attrs, _ := attrset.New(map[string]any{"project": "cabe"})
+	attrs, _ := attrset.New(map[string]any{testProjectAttribute: testProject})
 	first, err := mgr.ResolveForEncapsulation(context.Background(), attrs, nil)
 	if err != nil {
 		t.Fatalf("ResolveForEncapsulation(first) error = %v", err)
@@ -96,7 +101,7 @@ func TestManagerInvalidatesLeaseID(t *testing.T) {
 	}
 	mgr := New(tr, &Config{Now: func() time.Time { return now }})
 
-	attrs, _ := attrset.New(map[string]any{"project": "cabe"})
+	attrs, _ := attrset.New(map[string]any{testProjectAttribute: testProject})
 	first, err := mgr.ResolveForEncapsulation(context.Background(), attrs, nil)
 	if err != nil {
 		t.Fatalf("ResolveForEncapsulation(first) error = %v", err)
@@ -185,7 +190,7 @@ func TestManagerRetrogradeCacheLRUEvicts(t *testing.T) {
 		Now:                 func() time.Time { return time.Unix(100, 0) },
 	})
 	ctx := context.Background()
-	attrs, _ := attrset.New(map[string]any{"project": "cabe"})
+	attrs, _ := attrset.New(map[string]any{testProjectAttribute: testProject})
 
 	if _, err := mgr.ResolveForDecapsulation(ctx, attrs, []byte("ref-a"), nil); err != nil {
 		t.Fatalf("A: %v", err)
@@ -222,7 +227,7 @@ func TestManagerCachesRetrogradeByLeaseRef(t *testing.T) {
 		},
 	}
 	mgr := New(tr, &Config{Now: func() time.Time { return time.Unix(100, 0) }})
-	attrs, _ := attrset.New(map[string]any{"project": "cabe"})
+	attrs, _ := attrset.New(map[string]any{testProjectAttribute: testProject})
 
 	first, err := mgr.ResolveForDecapsulation(context.Background(), attrs, []byte("lease-ref"), nil)
 	if err != nil {
@@ -256,7 +261,7 @@ func TestManagerInvalidationClearsRetrogradeCache(t *testing.T) {
 		},
 	}
 	mgr := New(tr, &Config{Now: func() time.Time { return now }})
-	attrs, _ := attrset.New(map[string]any{"project": "cabe"})
+	attrs, _ := attrset.New(map[string]any{testProjectAttribute: testProject})
 
 	active, err := mgr.ResolveForEncapsulation(context.Background(), attrs, nil)
 	if err != nil {

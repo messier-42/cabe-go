@@ -14,6 +14,8 @@ import (
 	"github.com/messier-42/cabe-go/internal/leasemgr"
 )
 
+const testBinaryContentType = "application/octet-stream"
+
 func mustMarshalCOSEKey(t *testing.T, k key.Key) []byte {
 	t.Helper()
 	raw, err := key.MarshalCBOR(k)
@@ -43,7 +45,7 @@ func TestNonCaptiveEncapsulateAndDecapsulate(t *testing.T) {
 
 	encRes, err := codec.Encapsulate(context.Background(), EncapsulateArgs{
 		Payload:      payload,
-		ContentType:  "application/octet-stream",
+		ContentType:  testBinaryContentType,
 		AttributeSet: attrset.Repr(attrs),
 		Lease:        active,
 	})
@@ -80,7 +82,7 @@ func TestNonCaptiveEncapsulateAndDecapsulate(t *testing.T) {
 	if !bytes.Equal(decRes.Payload, payload) {
 		t.Fatalf("payload mismatch: %q != %q", decRes.Payload, payload)
 	}
-	if decRes.ContentType != "application/octet-stream" {
+	if decRes.ContentType != testBinaryContentType {
 		t.Fatalf("ContentType = %q", decRes.ContentType)
 	}
 }
@@ -100,7 +102,7 @@ func TestCaptiveEncapsulateAndDecapsulate(t *testing.T) {
 
 	encRes, err := codec.Encapsulate(context.Background(), EncapsulateArgs{
 		Payload:      payload,
-		ContentType:  "application/octet-stream",
+		ContentType:  testBinaryContentType,
 		AttributeSet: attrset.Repr(attrs),
 		Lease:        active,
 		Wrap: func(_ context.Context, token []byte, cek []byte) ([]byte, error) {

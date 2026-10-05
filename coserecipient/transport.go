@@ -58,7 +58,9 @@ func transportKey(k key.Key, private bool) (*rsa.PrivateKey, error) {
 	if !e.IsInt64() || e.Int64() < 3 || e.Int64() > (1<<31)-1 || e.Bit(0) == 0 {
 		return nil, errors.New("coserecipient: invalid public exponent")
 	}
-	parsed := &rsa.PrivateKey{PublicKey: rsa.PublicKey{N: n, E: int(e.Int64())}}
+	parsed := new(rsa.PrivateKey)
+	parsed.N = n
+	parsed.E = int(e.Int64())
 	if !private {
 		for label := iana.RSAKeyParameterD; label >= iana.RSAKeyParameterTI; label-- {
 			if k.Has(label) {

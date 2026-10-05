@@ -9,7 +9,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const testStructuredString = "two"
+
 func TestParseAttrSpec(t *testing.T) {
+	const urgentAttribute = "urgent"
 	cases := []struct {
 		in     string
 		key    string
@@ -20,9 +23,9 @@ func TestParseAttrSpec(t *testing.T) {
 		{in: "level=string:secret", key: "level", value: "secret"},
 		{in: "tier=int:42", key: "tier", value: int64(42)},
 		{in: "neg=int:-7", key: "neg", value: int64(-7)},
-		{in: "urgent=bool:true", key: "urgent", value: true},
-		{in: "urgent=bool:TRUE", key: "urgent", value: true},
-		{in: "urgent=bool:false", key: "urgent", value: false},
+		{in: "urgent=bool:true", key: urgentAttribute, value: true},
+		{in: "urgent=bool:TRUE", key: urgentAttribute, value: true},
+		{in: "urgent=bool:false", key: urgentAttribute, value: false},
 		{in: "empty=str:", key: "empty", value: ""},
 		{in: "with-hyphen=str:x", key: "with-hyphen", value: "x"},
 		// value contains a colon — we split only on the first colon after =
@@ -120,7 +123,7 @@ func TestBindEnvPrecedence(t *testing.T) {
 
 func TestWriteStructuredYAML(t *testing.T) {
 	var buf bytes.Buffer
-	if err := writeStructured(&buf, map[string]any{"a": 1, "b": "two"}, false); err != nil {
+	if err := writeStructured(&buf, map[string]any{"a": 1, "b": testStructuredString}, false); err != nil {
 		t.Fatalf("writeStructured() error = %v", err)
 	}
 	out := buf.String()
@@ -134,7 +137,7 @@ func TestWriteStructuredYAML(t *testing.T) {
 
 func TestWriteStructuredJSON(t *testing.T) {
 	var buf bytes.Buffer
-	v := map[string]any{"a": 1, "b": "two"}
+	v := map[string]any{"a": 1, "b": testStructuredString}
 	if err := writeStructured(&buf, v, true); err != nil {
 		t.Fatalf("writeStructured() error = %v", err)
 	}
@@ -143,7 +146,7 @@ func TestWriteStructuredJSON(t *testing.T) {
 	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
 		t.Fatalf("output not valid JSON: %v\n%s", err, buf.String())
 	}
-	if got["b"] != "two" {
+	if got["b"] != testStructuredString {
 		t.Fatalf("JSON output = %v, want b=two", got)
 	}
 }

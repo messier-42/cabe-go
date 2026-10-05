@@ -141,15 +141,13 @@ func (s *Subscription) run(ctx context.Context) error {
 
 	// Token rejections propagate as-is so callers can errors.Is
 	// against ErrTokenRejected.
-	var rej *tokenRejectionError
-	if errors.As(err, &rej) {
+	if rej, ok := errors.AsType[*tokenRejectionError](err); ok {
 		return rej
 	}
 	// Any remaining *ckap.Error flows through unchanged; anything
 	// else (ConnectionError with a non-cabe underlying cause, e.g.
 	// DNS failure after retry budget exhaustion) gets wrapped.
-	var cabeErr *ckap.Error
-	if errors.As(err, &cabeErr) {
+	if cabeErr, ok := errors.AsType[*ckap.Error](err); ok {
 		return cabeErr
 	}
 	return newClientError(opARIN, cabe.CodeReserved, 0, "", err)

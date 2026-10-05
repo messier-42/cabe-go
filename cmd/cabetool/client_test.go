@@ -16,6 +16,8 @@ import (
 	"time"
 )
 
+const testKeyPairRequired = "must be set together"
+
 // writeTestKeyPair generates a self-signed ECDSA cert + key PEM pair
 // in dir and returns the two file paths. The cert is valid for a day,
 // which is ample for a unit test.
@@ -120,8 +122,8 @@ func TestSelectAuthMode(t *testing.T) {
 		{name: "anonymous", opts: options{}, want: authAnonymous},
 		{name: "file mTLS", opts: options{ClientCert: "c", ClientKey: "k"}, want: authFileMTLS},
 		{name: "spiffe", opts: options{SPIFFESocket: "/sock", ServerSPIFFEIDRegex: "^spiffe://.*$"}, want: authSPIFFE},
-		{name: "cert without key", opts: options{ClientCert: "c"}, errSub: "must be set together"},
-		{name: "key without cert", opts: options{ClientKey: "k"}, errSub: "must be set together"},
+		{name: "cert without key", opts: options{ClientCert: "c"}, errSub: testKeyPairRequired},
+		{name: "key without cert", opts: options{ClientKey: "k"}, errSub: testKeyPairRequired},
 		{name: "cert and spiffe", opts: options{ClientCert: "c", ClientKey: "k", SPIFFESocket: "/s"}, errSub: "mutually exclusive"},
 		{name: "spiffe without regex", opts: options{SPIFFESocket: "/s"}, errSub: "--server-spiffe-id-regex is required"},
 		{name: "regex without spiffe", opts: options{ServerSPIFFEIDRegex: "^.*$"}, errSub: "requires --spiffe-socket"},

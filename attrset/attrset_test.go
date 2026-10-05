@@ -10,6 +10,8 @@ import (
 	"github.com/messier-42/cabe-go/attrset"
 )
 
+const testInvalidName = "1bad"
+
 func TestValidName(t *testing.T) {
 	cases := []struct {
 		in string
@@ -64,7 +66,7 @@ func TestNewZeroAndEmpty(t *testing.T) {
 }
 
 func TestNewValidates(t *testing.T) {
-	_, err := attrset.New(map[string]any{"1bad": "v"})
+	_, err := attrset.New(map[string]any{testInvalidName: "v"})
 	if err == nil {
 		t.Fatalf("New with invalid key: want error, got nil")
 	}
@@ -72,8 +74,8 @@ func TestNewValidates(t *testing.T) {
 	if !errors.As(err, &invName) {
 		t.Fatalf("error type = %T, want *attrset.InvalidNameError", err)
 	}
-	if invName.Name != "1bad" {
-		t.Fatalf("InvalidNameError.Name = %q, want %q", invName.Name, "1bad")
+	if invName.Name != testInvalidName {
+		t.Fatalf("InvalidNameError.Name = %q, want %q", invName.Name, testInvalidName)
 	}
 	if _, err := attrset.New(map[string]any{"ok": "v", "also-ok": 1}); err != nil {
 		t.Errorf("New with valid keys: error %v", err)
@@ -213,7 +215,7 @@ func TestNewFromBytesRejectsInvalid(t *testing.T) {
 		t.Fatal("garbage accepted")
 	}
 	// Valid CBOR map with an invalid Attribute Set key (leading digit).
-	invalid, _ := cbor.Marshal(map[string]any{"1bad": "v"})
+	invalid, _ := cbor.Marshal(map[string]any{testInvalidName: "v"})
 	if _, err := attrset.NewFromBytes(invalid); err == nil {
 		t.Fatal("invalid attrset key accepted")
 	}

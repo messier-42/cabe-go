@@ -188,7 +188,7 @@ func TestAuthFlagValidation(t *testing.T) {
 		{
 			name:   "cert without key",
 			args:   []string{testClientCertFlag, "/nowhere"},
-			errSub: "must be set together",
+			errSub: testKeyPairRequired,
 		},
 		{
 			name:   "cert and spiffe",

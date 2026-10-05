@@ -18,6 +18,12 @@ import (
 	"github.com/messier-42/cabe-go/ckapraw"
 )
 
+const (
+	testBaseURL           = "https://example.com/ckap/"
+	testPrincipalURI      = "principal:test"
+	testContentTypeHeader = "Content-Type"
+)
+
 func mustSet(t *testing.T, m map[string]any) attrset.Set {
 	t.Helper()
 	s, err := attrset.New(m)
@@ -36,7 +42,7 @@ func TestNewClientRejectsEmptyBaseURL(t *testing.T) {
 
 func TestClientGetSelf(t *testing.T) {
 	client, err := ckapclient.NewClient(ckapclient.Config{
-		BaseURL: "https://example.com/ckap/",
+		BaseURL: testBaseURL,
 		HTTPClient: &http.Client{
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				if r.URL.Path != "/ckap/GetSelf" {
@@ -45,7 +51,7 @@ func TestClientGetSelf(t *testing.T) {
 				data, err := key.MarshalCBOR(ckapraw.GetSelfResponse{
 					Kind: ckapraw.KindGetSelfResponse,
 					Principal: ckapraw.Principal{
-						URI:    "principal:test",
+						URI:    testPrincipalURI,
 						Claims: map[string]any{"role": "operator"},
 					},
 					ServerInfo: map[string]any{"name": "test-ks"},
@@ -66,7 +72,7 @@ func TestClientGetSelf(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetSelf() error = %v", err)
 	}
-	if resp.PrincipalInfo.URI != "principal:test" {
+	if resp.PrincipalInfo.URI != testPrincipalURI {
 		t.Fatalf("URI = %q", resp.PrincipalInfo.URI)
 	}
 	if resp.PrincipalInfo.Claims["role"] != "operator" {
@@ -76,7 +82,7 @@ func TestClientGetSelf(t *testing.T) {
 
 func TestClientProgradeReturnsLease(t *testing.T) {
 	client, err := ckapclient.NewClient(ckapclient.Config{
-		BaseURL: "https://example.com/ckap/",
+		BaseURL: testBaseURL,
 		HTTPClient: &http.Client{
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				if r.URL.Path != "/ckap/Prograde" {
@@ -142,7 +148,7 @@ func TestClientProgradeReturnsLease(t *testing.T) {
 func TestClientProgradeAttachesARINToken(t *testing.T) {
 	var gotToken []byte
 	client, err := ckapclient.NewClient(ckapclient.Config{
-		BaseURL: "https://example.com/ckap/",
+		BaseURL: testBaseURL,
 		HTTPClient: &http.Client{
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				body, _ := io.ReadAll(r.Body)
@@ -181,7 +187,7 @@ func TestClientProgradeAttachesARINToken(t *testing.T) {
 
 func TestClientRetrogradeReturnsLKAI(t *testing.T) {
 	client, err := ckapclient.NewClient(ckapclient.Config{
-		BaseURL: "https://example.com/ckap/",
+		BaseURL: testBaseURL,
 		HTTPClient: &http.Client{
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				if r.URL.Path != "/ckap/Retrograde" {
@@ -214,7 +220,7 @@ func TestClientRetrogradeReturnsLKAI(t *testing.T) {
 
 func TestClientAssistedEncapDecap(t *testing.T) {
 	client, err := ckapclient.NewClient(ckapclient.Config{
-		BaseURL: "https://example.com/ckap/",
+		BaseURL: testBaseURL,
 		HTTPClient: &http.Client{
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				body, _ := io.ReadAll(r.Body)
@@ -268,7 +274,7 @@ func TestClientAssistedEncapDecap(t *testing.T) {
 
 func TestClientServerErrorSurfacesAsCabeError(t *testing.T) {
 	client, err := ckapclient.NewClient(ckapclient.Config{
-		BaseURL: "https://example.com/ckap/",
+		BaseURL: testBaseURL,
 		HTTPClient: &http.Client{
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				data, _ := key.MarshalCBOR(ckapraw.Error{ErrorCode: 3, Summary: "denied"})
@@ -305,7 +311,7 @@ func TestClientServerErrorSurfacesAsCabeError(t *testing.T) {
 func TestClientCloseCancelsInFlight(t *testing.T) {
 	started := make(chan struct{})
 	client, err := ckapclient.NewClient(ckapclient.Config{
-		BaseURL: "https://example.com/ckap/",
+		BaseURL: testBaseURL,
 		HTTPClient: &http.Client{
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				close(started)
@@ -339,14 +345,14 @@ func TestClientCloseCancelsInFlight(t *testing.T) {
 
 func TestClientRejectsWrongResponseKind(t *testing.T) {
 	client, err := ckapclient.NewClient(ckapclient.Config{
-		BaseURL: "https://example.com/ckap/",
+		BaseURL: testBaseURL,
 		HTTPClient: &http.Client{
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				// Intentionally return a mis-labeled response.
 				data, _ := key.MarshalCBOR(ckapraw.GetSelfResponse{
 					Kind: "NotTheRightKind",
 					Principal: ckapraw.Principal{
-						URI: "principal:test",
+						URI: testPrincipalURI,
 					},
 				})
 				return cborResponse(http.StatusOK, data), nil
@@ -380,12 +386,12 @@ func TestClientRejectsOversizedResponse(t *testing.T) {
 	// valid CBOR — the size check fires before decoding.
 	big := bytes.Repeat([]byte{0x00}, 2<<20)
 	client, err := ckapclient.NewClient(ckapclient.Config{
-		BaseURL: "https://example.com/ckap/",
+		BaseURL: testBaseURL,
 		HTTPClient: &http.Client{
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				return &http.Response{
 					StatusCode:    http.StatusOK,
-					Header:        http.Header{"Content-Type": []string{"application/ckap+cbor"}},
+					Header:        http.Header{testContentTypeHeader: []string{"application/ckap+cbor"}},
 					Body:          io.NopCloser(bytes.NewReader(big)),
 					ContentLength: int64(len(big)),
 				}, nil
@@ -408,7 +414,7 @@ func TestClientRejectsOversizedResponse(t *testing.T) {
 
 func TestClientGetARINToken(t *testing.T) {
 	client, err := ckapclient.NewClient(ckapclient.Config{
-		BaseURL: "https://example.com/ckap/",
+		BaseURL: testBaseURL,
 		HTTPClient: &http.Client{
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				data, _ := key.MarshalCBOR(map[string]any{"arinToken": []byte("tok")})
@@ -433,7 +439,7 @@ func TestClientGetARINToken(t *testing.T) {
 func TestClientDefaultUserAgent(t *testing.T) {
 	var gotUA string
 	client, err := ckapclient.NewClient(ckapclient.Config{
-		BaseURL: "https://example.com/ckap/",
+		BaseURL: testBaseURL,
 		HTTPClient: &http.Client{
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				gotUA = r.Header.Get("User-Agent")
@@ -466,7 +472,7 @@ func TestClientDefaultUserAgent(t *testing.T) {
 func TestClientCustomUserAgent(t *testing.T) {
 	var gotUA string
 	client, err := ckapclient.NewClient(ckapclient.Config{
-		BaseURL:   "https://example.com/ckap/",
+		BaseURL:   testBaseURL,
 		UserAgent: "cabetool/0.1",
 		HTTPClient: &http.Client{
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
@@ -501,7 +507,7 @@ func (fn roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) {
 func cborResponse(status int, data []byte) *http.Response {
 	return &http.Response{
 		StatusCode: status,
-		Header:     http.Header{"Content-Type": []string{"application/ckap+cbor"}},
+		Header:     http.Header{testContentTypeHeader: []string{"application/ckap+cbor"}},
 		Body:       io.NopCloser(bytes.NewReader(data)),
 	}
 }

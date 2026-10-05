@@ -22,7 +22,7 @@ import (
 // path: a valid token yields events until the caller cancels.
 func TestSubscriptionStreamsEventsAndClosesOnCancel(t *testing.T) {
 	client, err := ckapclient.NewClient(ckapclient.Config{
-		BaseURL: "https://example.com/ckap/",
+		BaseURL: testBaseURL,
 		HTTPClient: &http.Client{
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				if r.URL.Path != "/ckap/ARIN" {
@@ -33,7 +33,7 @@ func TestSubscriptionStreamsEventsAndClosesOnCancel(t *testing.T) {
 				}
 				return &http.Response{
 					StatusCode: http.StatusOK,
-					Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+					Header:     http.Header{testContentTypeHeader: []string{"text/event-stream"}},
 					Body:       io.NopCloser(strings.NewReader("id: 1\nevent: invalidate\ndata: l-1\n\n")),
 				}, nil
 			}),
@@ -78,7 +78,7 @@ func TestSubscriptionStreamsEventsAndClosesOnCancel(t *testing.T) {
 func TestSubscriptionReturnsErrTokenRejected(t *testing.T) {
 	var arinCalls atomic.Int32
 	client, err := ckapclient.NewClient(ckapclient.Config{
-		BaseURL: "https://example.com/ckap/",
+		BaseURL: testBaseURL,
 		HTTPClient: &http.Client{
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				if r.URL.Path == "/ckap/ARINToken" {
@@ -134,7 +134,7 @@ func TestSubscriptionReturnsErrTokenRejected(t *testing.T) {
 // caller forgot to supply a token.
 func TestSubscriptionRejectsEmptyToken(t *testing.T) {
 	client, err := ckapclient.NewClient(ckapclient.Config{
-		BaseURL: "https://example.com/ckap/",
+		BaseURL: testBaseURL,
 		HTTPClient: &http.Client{
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				t.Fatal("HTTP layer should not be contacted for an empty token")

@@ -20,9 +20,15 @@ import (
 )
 
 const (
-	pathProgradePath  = "/ckap/Prograde"
-	pathARINTokenPath = "/ckap/ARINToken"
-	pathARINPath      = "/ckap/ARIN"
+	testProjectAttribute  = "project"
+	testBaseURL           = "https://example.com/ckap/"
+	testProject           = "cabe"
+	testBinaryContentType = "application/octet-stream"
+	testTextContentType   = "text/plain"
+	testContentTypeHeader = "Content-Type"
+	pathProgradePath      = "/ckap/Prograde"
+	pathARINTokenPath     = "/ckap/ARINToken"
+	pathARINPath          = "/ckap/ARIN"
 )
 
 func mustSet(t *testing.T, m map[string]any) attrset.Set {
@@ -88,7 +94,7 @@ func TestCapsulatorManagedNonCaptive(t *testing.T) {
 	})
 
 	client, err := ckapclient.NewClient(ckapclient.Config{
-		BaseURL:    "https://example.com/ckap/",
+		BaseURL:    testBaseURL,
 		HTTPClient: &http.Client{Transport: transport},
 	})
 	if err != nil {
@@ -100,8 +106,8 @@ func TestCapsulatorManagedNonCaptive(t *testing.T) {
 
 	env, err := c.Encapsulate(context.Background(), cabe.Message{
 		Payload:     []byte("hello cabe"),
-		Attributes:  mustSet(t, map[string]any{"project": "cabe"}),
-		ContentType: "application/octet-stream",
+		Attributes:  mustSet(t, map[string]any{testProjectAttribute: testProject}),
+		ContentType: testBinaryContentType,
 	})
 	if err != nil {
 		t.Fatalf("Encapsulate() error = %v", err)
@@ -164,7 +170,7 @@ func TestCapsulatorManagedCaptive(t *testing.T) {
 	})
 
 	c, err := cabecap.NewWithClient(ckapclient.Config{
-		BaseURL:    "https://example.com/ckap/",
+		BaseURL:    testBaseURL,
 		HTTPClient: &http.Client{Transport: transport},
 	}, cabecap.WithARIN(false))
 	if err != nil {
@@ -175,7 +181,7 @@ func TestCapsulatorManagedCaptive(t *testing.T) {
 	env, err := c.Encapsulate(context.Background(), cabe.Message{
 		Payload:     []byte("captive hello"),
 		Attributes:  mustSet(t, map[string]any{"level": "secret"}),
-		ContentType: "text/plain",
+		ContentType: testTextContentType,
 	})
 	if err != nil {
 		t.Fatalf("Encapsulate() error = %v", err)
@@ -197,7 +203,7 @@ func TestCapsulatorManagedCaptive(t *testing.T) {
 
 func TestCapsulatorDecapsulateInvalidEnvelopeError(t *testing.T) {
 	c, err := cabecap.NewWithClient(ckapclient.Config{
-		BaseURL:    "https://example.com/ckap/",
+		BaseURL:    testBaseURL,
 		HTTPClient: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) { t.Fatal("should not be called"); return nil, nil })},
 	})
 	if err != nil {
@@ -230,7 +236,7 @@ func TestCapsulatorARINInvalidatesCache(t *testing.T) {
 			}
 			return &http.Response{
 				StatusCode: http.StatusOK,
-				Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+				Header:     http.Header{testContentTypeHeader: []string{"text/event-stream"}},
 				Body:       io.NopCloser(strings.NewReader("id: 1\nevent: invalidate\ndata: lease-id-1\n\n")),
 			}, nil
 		case r.Method == http.MethodPost && r.URL.Path == pathProgradePath:
@@ -260,7 +266,7 @@ func TestCapsulatorARINInvalidatesCache(t *testing.T) {
 	})
 
 	c, err := cabecap.NewWithClient(ckapclient.Config{
-		BaseURL:    "https://example.com/ckap/",
+		BaseURL:    testBaseURL,
 		HTTPClient: &http.Client{Transport: transport},
 	})
 	if err != nil {
@@ -270,8 +276,8 @@ func TestCapsulatorARINInvalidatesCache(t *testing.T) {
 
 	if _, err := c.Encapsulate(context.Background(), cabe.Message{
 		Payload:     []byte("hello"),
-		Attributes:  mustSet(t, map[string]any{"project": "cabe"}),
-		ContentType: "text/plain",
+		Attributes:  mustSet(t, map[string]any{testProjectAttribute: testProject}),
+		ContentType: testTextContentType,
 	}); err != nil {
 		t.Fatalf("Encapsulate() error = %v", err)
 	}
@@ -285,8 +291,8 @@ func TestCapsulatorARINInvalidatesCache(t *testing.T) {
 	requireEventually(t, 2*time.Second, func() bool {
 		_, err := c.Encapsulate(context.Background(), cabe.Message{
 			Payload:     []byte("hello"),
-			Attributes:  mustSet(t, map[string]any{"project": "cabe"}),
-			ContentType: "text/plain",
+			Attributes:  mustSet(t, map[string]any{testProjectAttribute: testProject}),
+			ContentType: testTextContentType,
 		})
 		return err == nil && progradeCalls.Load() >= 2
 	})
@@ -321,7 +327,7 @@ func TestCapsulatorARINRefreshesExpiredToken(t *testing.T) {
 				}
 				return &http.Response{
 					StatusCode: http.StatusOK,
-					Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+					Header:     http.Header{testContentTypeHeader: []string{"text/event-stream"}},
 					Body:       io.NopCloser(strings.NewReader("id: 1\nevent: invalidate\ndata: lease-id-1\n\n")),
 				}, nil
 			}
@@ -352,7 +358,7 @@ func TestCapsulatorARINRefreshesExpiredToken(t *testing.T) {
 	})
 
 	c, err := cabecap.NewWithClient(ckapclient.Config{
-		BaseURL:    "https://example.com/ckap/",
+		BaseURL:    testBaseURL,
 		HTTPClient: &http.Client{Transport: transport},
 	})
 	if err != nil {
@@ -362,8 +368,8 @@ func TestCapsulatorARINRefreshesExpiredToken(t *testing.T) {
 
 	if _, err := c.Encapsulate(context.Background(), cabe.Message{
 		Payload:     []byte("hello"),
-		Attributes:  mustSet(t, map[string]any{"project": "cabe"}),
-		ContentType: "application/octet-stream",
+		Attributes:  mustSet(t, map[string]any{testProjectAttribute: testProject}),
+		ContentType: testBinaryContentType,
 	}); err != nil {
 		t.Fatalf("Encapsulate(first) error = %v", err)
 	}
@@ -371,8 +377,8 @@ func TestCapsulatorARINRefreshesExpiredToken(t *testing.T) {
 	requireEventually(t, 2*time.Second, func() bool {
 		_, err := c.Encapsulate(context.Background(), cabe.Message{
 			Payload:     []byte("hello"),
-			Attributes:  mustSet(t, map[string]any{"project": "cabe"}),
-			ContentType: "application/octet-stream",
+			Attributes:  mustSet(t, map[string]any{testProjectAttribute: testProject}),
+			ContentType: testBinaryContentType,
 		})
 		return err == nil &&
 			progradeCalls.Load() >= 2 &&
@@ -422,7 +428,7 @@ func TestCapsulatorARINUnsupportedServerIsBestEffort(t *testing.T) {
 	})
 
 	c, err := cabecap.NewWithClient(ckapclient.Config{
-		BaseURL:    "https://example.com/ckap/",
+		BaseURL:    testBaseURL,
 		HTTPClient: &http.Client{Transport: transport},
 	})
 	if err != nil {
@@ -432,8 +438,8 @@ func TestCapsulatorARINUnsupportedServerIsBestEffort(t *testing.T) {
 
 	if _, err := c.Encapsulate(context.Background(), cabe.Message{
 		Payload:     []byte("hello"),
-		Attributes:  mustSet(t, map[string]any{"project": "cabe"}),
-		ContentType: "text/plain",
+		Attributes:  mustSet(t, map[string]any{testProjectAttribute: testProject}),
+		ContentType: testTextContentType,
 	}); err != nil {
 		t.Fatalf("Encapsulate() error = %v", err)
 	}
@@ -452,8 +458,8 @@ func TestCapsulatorARINUnsupportedServerIsBestEffort(t *testing.T) {
 	// unsupported state is sticky for the capsulator's lifetime.
 	if _, err := c.Encapsulate(context.Background(), cabe.Message{
 		Payload:     []byte("hello"),
-		Attributes:  mustSet(t, map[string]any{"project": "cabe2"}),
-		ContentType: "text/plain",
+		Attributes:  mustSet(t, map[string]any{testProjectAttribute: "cabe2"}),
+		ContentType: testTextContentType,
 	}); err != nil {
 		t.Fatalf("Encapsulate() second error = %v", err)
 	}
@@ -478,7 +484,7 @@ func TestCapsulatorARINServerErrorPropagates(t *testing.T) {
 	})
 
 	c, err := cabecap.NewWithClient(ckapclient.Config{
-		BaseURL:    "https://example.com/ckap/",
+		BaseURL:    testBaseURL,
 		HTTPClient: &http.Client{Transport: transport},
 	})
 	if err != nil {
@@ -488,8 +494,8 @@ func TestCapsulatorARINServerErrorPropagates(t *testing.T) {
 
 	_, err = c.Encapsulate(context.Background(), cabe.Message{
 		Payload:     []byte("hello"),
-		Attributes:  mustSet(t, map[string]any{"project": "cabe"}),
-		ContentType: "text/plain",
+		Attributes:  mustSet(t, map[string]any{testProjectAttribute: testProject}),
+		ContentType: testTextContentType,
 	})
 	if err == nil {
 		t.Fatal("expected Encapsulate error when GetARINToken fails with a non-unsupported code")
@@ -498,7 +504,7 @@ func TestCapsulatorARINServerErrorPropagates(t *testing.T) {
 
 func TestCapsulatorCloseWithOwnedClient(t *testing.T) {
 	c, err := cabecap.NewWithClient(ckapclient.Config{
-		BaseURL:    "https://example.com/ckap/",
+		BaseURL:    testBaseURL,
 		HTTPClient: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) { return nil, errors.New("unused") })},
 	})
 	if err != nil {
@@ -534,7 +540,7 @@ func (fn roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { ret
 func cborResponse(status int, data []byte) *http.Response {
 	return &http.Response{
 		StatusCode: status,
-		Header:     http.Header{"Content-Type": []string{"application/ckap+cbor"}},
+		Header:     http.Header{testContentTypeHeader: []string{"application/ckap+cbor"}},
 		Body:       io.NopCloser(bytes.NewReader(data)),
 	}
 }
