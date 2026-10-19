@@ -7,6 +7,8 @@
 //   - `attrset`, providing a safe interface for working with, serializing and deserializing
 //     CABE Attribute Set representations.
 //
+//   - `acp240`, providing optional CABE-ACP240 construction and validation.
+//
 //   - `ckapclient`, providing low level raw CKAP protocol operations.
 //
 //   - `cabecap`, providing a managed CABE Encapsulator/Decapsulator.
