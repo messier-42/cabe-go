@@ -45,12 +45,15 @@ func TestCapsulatorManagedNonCaptive(t *testing.T) {
 	var retrogradeCalls int
 	transport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		calls = append(calls, r.URL.Path)
-		body, _ := io.ReadAll(r.Body)
 		switch r.URL.Path {
 		case pathProgradePath:
+			body, _ := io.ReadAll(r.Body)
 			var req ckapraw.ProgradeRequest
 			if err := key.UnmarshalCBOR(body, &req); err != nil {
 				t.Fatalf("UnmarshalCBOR() error = %v", err)
+			}
+			if len(req.ARINToken) != 0 {
+				t.Fatalf("ARINToken = %q, want none by default", req.ARINToken)
 			}
 			data, err := key.MarshalCBOR(ckapraw.ProgradeResponse{
 				Kind: ckapraw.KindProgradeResponse,
@@ -100,13 +103,17 @@ func TestCapsulatorManagedNonCaptive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewClient() error = %v", err)
 	}
-	c := cabecap.New(client, cabecap.WithARIN(false))
+	c := cabecap.New(client)
 	defer c.Close()      // best effort
 	defer client.Close() // best effort
 
+	attrs := mustSet(t, map[string]any{testProjectAttribute: testProject})
+	if err := c.WarmLease(context.Background(), attrs); err != nil {
+		t.Fatalf("WarmLease() error = %v", err)
+	}
 	env, err := c.Encapsulate(context.Background(), cabe.Message{
 		Payload:     []byte("hello cabe"),
-		Attributes:  mustSet(t, map[string]any{testProjectAttribute: testProject}),
+		Attributes:  attrs,
 		ContentType: testBinaryContentType,
 	})
 	if err != nil {
@@ -220,6 +227,68 @@ func TestCapsulatorDecapsulateInvalidEnvelopeError(t *testing.T) {
 	}
 }
 
+func TestCapsulatorWarmLeaseWithoutARIN(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		opts []cabecap.Option
+	}{
+		{name: "default"},
+		{name: "explicitly disabled", opts: []cabecap.Option{cabecap.WithARIN(false)}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var progradeCalls int
+			transport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				if r.Method != http.MethodPost || r.URL.Path != pathProgradePath {
+					t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+				}
+				body, _ := io.ReadAll(r.Body)
+				var req ckapraw.ProgradeRequest
+				if err := key.UnmarshalCBOR(body, &req); err != nil {
+					t.Fatalf("UnmarshalCBOR() error = %v", err)
+				}
+				if len(req.ARINToken) != 0 {
+					t.Fatalf("ARINToken = %q, want none", req.ARINToken)
+				}
+				progradeCalls++
+				expiry := time.Now().Add(time.Hour).Unix()
+				if progradeCalls == 1 {
+					// The first lease has expired, so the next call must refresh it.
+					expiry = time.Now().Add(-time.Hour).Unix()
+				}
+				data, err := key.MarshalCBOR(ckapraw.ProgradeResponse{
+					Kind: ckapraw.KindProgradeResponse,
+					Lease: ckapraw.Lease{
+						LeaseRef: []byte("lease-ref"),
+						LKAI:     ckapraw.LKAI{Captive: &ckapraw.LKAIActive{LeaseKeyAccessToken: []byte("lkat")}},
+						Expiry:   expiry,
+					},
+				})
+				if err != nil {
+					t.Fatalf("MarshalCBOR() error = %v", err)
+				}
+				return cborResponse(http.StatusOK, data), nil
+			})
+			c, err := cabecap.NewWithClient(ckapclient.Config{
+				BaseURL:    testBaseURL,
+				HTTPClient: &http.Client{Transport: transport},
+			}, tt.opts...)
+			if err != nil {
+				t.Fatalf("NewWithClient() error = %v", err)
+			}
+			defer c.Close() // best effort
+			attrs := mustSet(t, map[string]any{testProjectAttribute: testProject})
+			for _, wantCalls := range []int{1, 2, 2} {
+				if err := c.WarmLease(context.Background(), attrs); err != nil {
+					t.Fatalf("WarmLease() error = %v", err)
+				}
+				if progradeCalls != wantCalls {
+					t.Fatalf("progradeCalls = %d, want %d", progradeCalls, wantCalls)
+				}
+			}
+		})
+	}
+}
+
 func TestCapsulatorARINInvalidatesCache(t *testing.T) {
 	var progradeCalls atomic.Int32
 	streamDelivered := make(chan struct{}, 1)
@@ -240,6 +309,14 @@ func TestCapsulatorARINInvalidatesCache(t *testing.T) {
 				Body:       io.NopCloser(strings.NewReader("id: 1\nevent: invalidate\ndata: lease-id-1\n\n")),
 			}, nil
 		case r.Method == http.MethodPost && r.URL.Path == pathProgradePath:
+			body, _ := io.ReadAll(r.Body)
+			var req ckapraw.ProgradeRequest
+			if err := key.UnmarshalCBOR(body, &req); err != nil {
+				t.Fatalf("UnmarshalCBOR() error = %v", err)
+			}
+			if !bytes.Equal(req.ARINToken, []byte("arin-token")) {
+				t.Fatalf("ARINToken = %q, want arin-token", req.ARINToken)
+			}
 			progradeCalls.Add(1)
 			data, _ := key.MarshalCBOR(ckapraw.ProgradeResponse{
 				Kind: ckapraw.KindProgradeResponse,
@@ -268,7 +345,7 @@ func TestCapsulatorARINInvalidatesCache(t *testing.T) {
 	c, err := cabecap.NewWithClient(ckapclient.Config{
 		BaseURL:    testBaseURL,
 		HTTPClient: &http.Client{Transport: transport},
-	})
+	}, cabecap.WithARIN(true))
 	if err != nil {
 		t.Fatalf("NewWithClient() error = %v", err)
 	}
@@ -360,7 +437,7 @@ func TestCapsulatorARINRefreshesExpiredToken(t *testing.T) {
 	c, err := cabecap.NewWithClient(ckapclient.Config{
 		BaseURL:    testBaseURL,
 		HTTPClient: &http.Client{Transport: transport},
-	})
+	}, cabecap.WithARIN(true))
 	if err != nil {
 		t.Fatalf("NewWithClient() error = %v", err)
 	}
@@ -430,7 +507,7 @@ func TestCapsulatorARINUnsupportedServerIsBestEffort(t *testing.T) {
 	c, err := cabecap.NewWithClient(ckapclient.Config{
 		BaseURL:    testBaseURL,
 		HTTPClient: &http.Client{Transport: transport},
-	})
+	}, cabecap.WithARIN(true))
 	if err != nil {
 		t.Fatalf("NewWithClient() error = %v", err)
 	}
@@ -486,7 +563,7 @@ func TestCapsulatorARINServerErrorPropagates(t *testing.T) {
 	c, err := cabecap.NewWithClient(ckapclient.Config{
 		BaseURL:    testBaseURL,
 		HTTPClient: &http.Client{Transport: transport},
-	})
+	}, cabecap.WithARIN(true))
 	if err != nil {
 		t.Fatalf("NewWithClient() error = %v", err)
 	}

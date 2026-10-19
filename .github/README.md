@@ -458,15 +458,15 @@ The relevant pieces are:
 - `cabecap` background ARIN handling
 - `internal/leasemgr.Manager` lease invalidation by Lease ID
 
-By default, `cabecap` attempts to use ARIN. If the Key Server reports that ARIN is unsupported, the `Capsulator` logs a warning and continues without invalidation events.
+ARIN is disabled by default. The khaled reference Key Server does not yet implement ARIN. Without ARIN, cached leases are kept until expiry or local eviction.
 
-ARIN can be disabled explicitly:
+For a Key Server that supports ARIN, enable it explicitly:
 
 ```go
-capsulator := cabecap.New(client, cabecap.WithARIN(false))
+capsulator := cabecap.New(client, cabecap.WithARIN(true))
 ```
 
-When disabled, cached leases are kept until expiry or local eviction.
+If ARIN is enabled and the Key Server reports `CodeUnsupported`, the `Capsulator` logs a warning and continues without invalidation events. `WithARIN(false)` explicitly keeps ARIN disabled.
 
 ```mermaid
 sequenceDiagram
