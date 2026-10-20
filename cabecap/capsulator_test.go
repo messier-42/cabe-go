@@ -45,12 +45,15 @@ func TestCapsulatorManagedNonCaptive(t *testing.T) {
 	var retrogradeCalls int
 	transport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		calls = append(calls, r.URL.Path)
-		body, _ := io.ReadAll(r.Body)
 		switch r.URL.Path {
 		case pathProgradePath:
+			body, _ := io.ReadAll(r.Body)
 			var req ckapraw.ProgradeRequest
 			if err := key.UnmarshalCBOR(body, &req); err != nil {
 				t.Fatalf("UnmarshalCBOR() error = %v", err)
+			}
+			if len(req.ARINToken) != 0 {
+				t.Fatalf("ARINToken = %q, want none by default", req.ARINToken)
 			}
 			data, err := key.MarshalCBOR(ckapraw.ProgradeResponse{
 				Kind: ckapraw.KindProgradeResponse,
@@ -100,13 +103,17 @@ func TestCapsulatorManagedNonCaptive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewClient() error = %v", err)
 	}
-	c := cabecap.New(client, cabecap.WithARIN(false))
+	c := cabecap.New(client)
 	defer c.Close()      // best effort
 	defer client.Close() // best effort
 
+	attrs := mustSet(t, map[string]any{testProjectAttribute: testProject})
+	if err := c.WarmLease(context.Background(), attrs); err != nil {
+		t.Fatalf("WarmLease() error = %v", err)
+	}
 	env, err := c.Encapsulate(context.Background(), cabe.Message{
 		Payload:     []byte("hello cabe"),
-		Attributes:  mustSet(t, map[string]any{testProjectAttribute: testProject}),
+		Attributes:  attrs,
 		ContentType: testBinaryContentType,
 	})
 	if err != nil {
@@ -169,10 +176,11 @@ func TestCapsulatorManagedCaptive(t *testing.T) {
 		}
 	})
 
+	// Explicitly disabling ARIN must override a prior opt-in.
 	c, err := cabecap.NewWithClient(ckapclient.Config{
 		BaseURL:    testBaseURL,
 		HTTPClient: &http.Client{Transport: transport},
-	}, cabecap.WithARIN(false))
+	}, cabecap.WithARIN(true), cabecap.WithARIN(false))
 	if err != nil {
 		t.Fatalf("NewWithClient() error = %v", err)
 	}
@@ -240,6 +248,14 @@ func TestCapsulatorARINInvalidatesCache(t *testing.T) {
 				Body:       io.NopCloser(strings.NewReader("id: 1\nevent: invalidate\ndata: lease-id-1\n\n")),
 			}, nil
 		case r.Method == http.MethodPost && r.URL.Path == pathProgradePath:
+			body, _ := io.ReadAll(r.Body)
+			var req ckapraw.ProgradeRequest
+			if err := key.UnmarshalCBOR(body, &req); err != nil {
+				t.Fatalf("UnmarshalCBOR() error = %v", err)
+			}
+			if !bytes.Equal(req.ARINToken, []byte("arin-token")) {
+				t.Fatalf("ARINToken = %q, want arin-token", req.ARINToken)
+			}
 			progradeCalls.Add(1)
 			data, _ := key.MarshalCBOR(ckapraw.ProgradeResponse{
 				Kind: ckapraw.KindProgradeResponse,
@@ -268,7 +284,7 @@ func TestCapsulatorARINInvalidatesCache(t *testing.T) {
 	c, err := cabecap.NewWithClient(ckapclient.Config{
 		BaseURL:    testBaseURL,
 		HTTPClient: &http.Client{Transport: transport},
-	})
+	}, cabecap.WithARIN(true))
 	if err != nil {
 		t.Fatalf("NewWithClient() error = %v", err)
 	}
@@ -360,7 +376,7 @@ func TestCapsulatorARINRefreshesExpiredToken(t *testing.T) {
 	c, err := cabecap.NewWithClient(ckapclient.Config{
 		BaseURL:    testBaseURL,
 		HTTPClient: &http.Client{Transport: transport},
-	})
+	}, cabecap.WithARIN(true))
 	if err != nil {
 		t.Fatalf("NewWithClient() error = %v", err)
 	}
@@ -430,7 +446,7 @@ func TestCapsulatorARINUnsupportedServerIsBestEffort(t *testing.T) {
 	c, err := cabecap.NewWithClient(ckapclient.Config{
 		BaseURL:    testBaseURL,
 		HTTPClient: &http.Client{Transport: transport},
-	})
+	}, cabecap.WithARIN(true))
 	if err != nil {
 		t.Fatalf("NewWithClient() error = %v", err)
 	}
@@ -486,7 +502,7 @@ func TestCapsulatorARINServerErrorPropagates(t *testing.T) {
 	c, err := cabecap.NewWithClient(ckapclient.Config{
 		BaseURL:    testBaseURL,
 		HTTPClient: &http.Client{Transport: transport},
-	})
+	}, cabecap.WithARIN(true))
 	if err != nil {
 		t.Fatalf("NewWithClient() error = %v", err)
 	}

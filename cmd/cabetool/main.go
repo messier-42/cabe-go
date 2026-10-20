@@ -60,8 +60,7 @@ func newRootCommand() *cobra.Command {
 		Short: "Diagnostic CLI for CABE",
 		Long: `cabetool is a stateless diagnostic command-line utility for
 working with a CABE deployment. Top-level commands cover everyday
-encap/decap/whoami flows; the "diag" subtree holds raw protocol and
-inspection commands.`,
+encap/decap/whoami flows.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {

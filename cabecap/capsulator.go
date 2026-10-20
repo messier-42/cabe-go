@@ -19,8 +19,8 @@ import (
 
 // Capsulator provides managed CABE envelope encapsulation and decapsulation.
 // It manages cached leases returned by Prograde key resolution, reuses them across
-// Encapsulate calls for the same attribute set, and (unless ARIN has been
-// disabled) invalidates cache entries when asynchronously notified of
+// Encapsulate calls for the same attribute set, and (when ARIN is explicitly
+// enabled) invalidates cache entries when asynchronously notified of
 // lease invalidation.
 //
 // Construct a Capsulator with [New] (when the caller owns the underlying
@@ -72,7 +72,7 @@ func NewWithClient(cfg ckapclient.Config, opts ...Option) (*Capsulator, error) {
 }
 
 func newCapsulator(client *ckapclient.Client, owned bool, opts []Option) *Capsulator {
-	cfg := config{}
+	cfg := config{DisableARIN: true}
 	for _, apply := range opts {
 		apply(&cfg)
 	}
