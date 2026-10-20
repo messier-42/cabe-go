@@ -72,6 +72,7 @@ The Key Server remains responsible for policy decisions and lease issuance. The 
 
 ```text
 attrset/              Safe CABE Attribute Set construction and canonical encoding
+acp240/               Optional CABE-ACP240 construction and profile validation
 cabe/                 Common public CABE types: Message, Lease, LKAI, errors, ARIN events
 cabecap/              High-level managed encapsulation and decapsulation API
 cbes/                 CBES envelope inspection helpers
@@ -90,6 +91,7 @@ internal/leasemgr/    Internal client-side lease cache used by cabecap
 | --- | --- |
 | Encrypt and decrypt CABE envelopes from an application | `cabecap` |
 | Build or validate CABE Attribute Sets | `attrset` |
+| Construct or validate CABE-ACP240 attributes explicitly | `acp240` |
 | Call CKAP operations directly | `ckapclient` |
 | Work with transport-independent CKAP request/response types | `ckap` |
 | Inspect envelope headers without decrypting | `cbes` |
@@ -260,6 +262,54 @@ attrs, err := attrset.NewFromBytes(raw)
 ```
 
 This validates both CBOR structure and deterministic encoding. Non-canonical encodings are rejected even if they decode to the same logical map.
+
+### CABE-ACP240 attributes
+
+The optional [`acp240` package](https://pkg.go.dev/github.com/messier-42/cabe-go/acp240) implements the published [CABE-ACP240 mapping](https://cabespec.org/spec/acp240/). Generic `attrset`, `cabecap`, and CKAP operations do not select this profile automatically.
+
+Construct attributes from structured input:
+
+```go
+attrs, err := acp240.New(acp240.Attributes{
+	PolicyIdentifier: "public",
+	Sensitivity:      "unmarked",
+	Releasability:    []string{"usa", "fvey", "can"},
+})
+// On success: p=PUBLIC, s=UNMARKED, r=CAN,FVEY,USA.
+```
+
+`New` uppercases values, sorts lists, and checks the explicit mapping rules. It rejects duplicates, invalid items, and invalid combinations; it does not trim whitespace or expand groups. A nil slice omits an optional attribute; a non-nil empty slice encodes an empty string where permitted. Each slice element is one value, without commas. Construction alone does not establish complete policy conformance.
+
+For existing Sets, validation never normalizes values or changes their identity:
+
+```go
+profile := acp240.Profile{}
+err = profile.ValidateStructure(attrs) // All explicit mapping rules, including NATO/PUBLIC constraints.
+err = profile.Validate(attrs)          // Also requires delegated governing policy checks.
+```
+
+`ValidateStructure` enforces required attributes, types, ABNF, case, sort order, uniqueness, and the explicit policy-dependent rules. NATO requires one non-empty context and excludes `RELEASABLE` from `c`; PUBLIC requires `s=UNMARKED` and forbids `c` and `o`. An `o` value must be non-empty and requires an actual `c` attribute. Only `p`, `s`, `r`, `c`, and `o` are checked; other CABE attributes are preserved.
+
+`Validate` returns `acp240.ErrPolicyRequired` (test with `errors.Is`) when delegated policy rules are unavailable. This applies to national sensitivities and Context/Only rules, including NATO's additional Context/Only semantics. PUBLIC needs no callback. Supply the relevant policy implementation when complete validation is required:
+
+```go
+profile := acp240.Profile{
+	ValidatePolicy: validateGoverningPolicy, // func(acp240.Attributes) error
+}
+err := profile.Validate(attrs)
+```
+
+The callback runs after all explicit rules pass. It must reject unsupported policies and enforce their additional requirements, including allowed combinations and presence/absence rules. Callback errors are wrapped and remain accessible with `errors.Is`/`errors.As`; violations of explicit rules return `*acp240.ValidationError` with an attribute name and reason. The SDK supplies no national policy catalogue or Key Service authorization decision.
+
+`p` identifies the governing policy understood by the encapsulator, not the encapsulator or originator. Changing originator alone does not require a different Attribute Set. Group membership and meaning are policy-dependent: `r=FVEY` and `r=AUS,CAN,GBR,NZL,USA` remain distinct Sets and select distinct key series.
+
+Country identifiers require three uppercase ASCII letters. The published ABNF uses case-insensitive literals for `NATO` and `PUBLIC`; validation applies their corresponding rules to ASCII case variants without rewriting them. These spellings retain distinct serialized identities. `New` emits uppercase identifiers. The specification does not explicitly settle a canonical spelling for those literals.
+
+For the explicit legacy NATO exception, set `Profile.DefaultNATOContext` to a single canonical context value. It is used only when validating an existing Set without `c`, passed to the policy callback, and never inserted into the Set. It does not permit empty or invalid explicit contexts, bypass delegated policy checks, or allow `o` without an actual `c`. `New` always requires an explicit NATO context.
+
+Use `attrset.NewFromBytes` before profile validation of serialized input; it rejects non-deterministic CBOR. A canonical Set's `Repr()` remains byte-for-byte identical after decoding and validation, including under the compatibility exception.
+
+This API accepts mapped attributes, not STANAG 4774 XML or a complete source label. Translators must separately preserve and enforce applicable restrictions, including unmapped restrictive metadata, or fail translation. The package does not infer mappings for Additional Sensitivity, OriginatorID, CreationDateTime, or other fields, and does not establish comprehensive ACP 240 or STANAG 4774 conformance.
 
 ---
 
@@ -498,6 +548,7 @@ It supports:
 - `whoami` — call CKAP `GetSelf`
 - `encap` — encapsulate plaintext into a CBES envelope
 - `decap` — decapsulate a CBES envelope into plaintext
+- `validate --profile acp240` — validate local CABE-ACP240 attributes
 
 Example:
 
@@ -529,6 +580,26 @@ cabetool \
   --out plaintext.txt \
   --meta-out metadata.yaml
 ```
+
+### Attribute validation
+
+Validation uses the same `-A` parser as `encap`, without contacting a Key Service:
+
+```shell
+cabetool validate --profile acp240 -A p=str:PUBLIC -A s=str:UNMARKED
+cabetool validate --profile acp240 --in attributes.cbor
+```
+
+Successful full validation reports `scope: full`. Invalid or noncanonical values produce an attribute-specific error and a nonzero exit status. `--in -` reads deterministic CBOR from stdin; `--in` and `-A` are mutually exclusive.
+
+NATO and national policies need delegated policy checks through the API. Without those checks, the command fails with an insufficient-policy-information error. Select `--structural-only` to run all explicit mapping rules and report only `scope: structural-only`:
+
+```shell
+cabetool validate --profile acp240 --structural-only \
+  -A p=str:NATO -A s=str:SECRET -A c=str:EXERCISE -A r=str:FVEY
+```
+
+`EXERCISE` illustrates syntax, not an approved NATO policy value. Structural success does not establish policy conformance. For an existing NATO Set without `c`, `--nato-default-context EXERCISE` explicitly supplies a compatibility default; it does not alter the input Set. Output follows the existing YAML default or `-J` JSON convention. `encap` and `decap` retain their generic behavior.
 
 ### Authentication Modes
 
@@ -982,6 +1053,7 @@ The CABE specifications define the architecture, envelope format, and key access
 - [CABE Architecture](https://cabespec.org/spec/arch/)
 - [CABE Baseline Envelope Structure (CBES)](https://cabespec.org/spec/cbes/)
 - [CABE Key Access Protocol (CKAP)](https://cabespec.org/spec/ckap/)
+- [CABE-ACP240 Attribute Mapping](https://cabespec.org/spec/acp240/)
 - [CABE specification site](https://cabespec.org/)
 
 ---

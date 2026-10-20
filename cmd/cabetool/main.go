@@ -83,6 +83,7 @@ encap/decap/whoami flows.`,
 		newWhoamiCommand(opts),
 		newEncapCommand(opts),
 		newDecapCommand(opts),
+		newValidateCommand(opts),
 	)
 	return root
 }
